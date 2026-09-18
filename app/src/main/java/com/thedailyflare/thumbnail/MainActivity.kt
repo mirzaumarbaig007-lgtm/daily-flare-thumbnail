@@ -396,59 +396,61 @@ class MainActivity : ComponentActivity() {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
 
-        // First determine the actual wrapped line count using a width-fitting size.
-        var size = headlineAreaHeight
-        var layout: StaticLayout
-        while (true) {
+        // Find the largest font that naturally wraps the headline into no more than
+        // four lines. StaticLayout wraps at word boundaries, so words fill the current
+        // line until the available width is exhausted, then continue on the next line.
+        fun layoutFor(size: Float): StaticLayout {
             paint.textSize = size
-            layout = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
+            return StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setIncludePad(false)
                 .setLineSpacing(0f, 1f)
                 .build()
-            if (layout.lineCount <= 4 || size <= 12f) break
-            size *= 0.9f
         }
 
-        val targetLines = layout.lineCount.coerceIn(1, 4)
-        val allocatedLineHeight = headlineAreaHeight / targetLines
-
-        // Derive font size from the exact vertical allocation, not a fixed font size.
-        val unitPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = paint.typeface
-            textSize = 1f
-        }
-        val unitMetrics = unitPaint.fontMetrics
-        val fontScale = allocatedLineHeight /
-            (unitMetrics.descent - unitMetrics.ascent).coerceAtLeast(1f)
-        var finalSize = fontScale.coerceAtLeast(8f)
-
-        // Width can force a smaller size, but the line allocation remains targetLines.
-        repeat(8) {
-            paint.textSize = finalSize
-            val check = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setIncludePad(false)
-                .setLineSpacing(0f, 1f)
-                .build()
-            if (check.lineCount > targetLines) {
-                finalSize *= 0.94f
+        var low = 8f
+        var high = headlineAreaHeight
+        repeat(18) {
+            val mid = (low + high) / 2f
+            val layout = layoutFor(mid)
+            val fontHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
+            if (layout.lineCount <= 4 && fontHeight <= headlineAreaHeight) {
+                low = mid
+            } else {
+                high = mid
             }
         }
 
-        paint.textSize = finalSize
-        val finalLayout = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setIncludePad(false)
-            .setLineSpacing(0f, 1f)
-            .build()
+        var finalSize = low
+        var layout = layoutFor(finalSize)
+        var lineCount = layout.lineCount.coerceIn(1, 4)
+
+        // Each wrapped line gets exactly its share of the bottom 20% area.
+        val allocatedLineHeight = headlineAreaHeight / lineCount
+
+        // If the 4-line result is too tall for its allocated vertical slot, reduce
+        // the font until its actual glyph height fits that slot without changing
+        // word-based wrapping.
+        repeat(12) {
+            paint.textSize = finalSize
+            val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
+            if (glyphHeight <= allocatedLineHeight) return@repeat
+            finalSize *= 0.96f
+            layout = layoutFor(finalSize)
+            lineCount = layout.lineCount.coerceIn(1, 4)
+        }
+
+        // Recalculate after any size adjustment.
+        layout = layoutFor(finalSize)
+        lineCount = layout.lineCount.coerceIn(1, 4)
 
         return HeadlineMetrics(
             textSize = finalSize,
-            lineHeight = allocatedLineHeight,
-            lineCount = finalLayout.lineCount.coerceAtMost(4)
+            lineHeight = headlineAreaHeight / lineCount,
+            lineCount = lineCount
         )
     }
+
 
     @Composable
     private fun TextHighlightDialog(
