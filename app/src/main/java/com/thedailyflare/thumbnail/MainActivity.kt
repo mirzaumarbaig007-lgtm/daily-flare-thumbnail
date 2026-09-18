@@ -135,19 +135,19 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.height(12.dp))
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(Modifier.weight(1f), onClick = { mainPicker.launch(arrayOf("image/*")) }) {
+                Button(onClick = { mainPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
                     Text(if (mainBitmap == null) "1. Main Image" else "Change Image", fontWeight = FontWeight.Bold)
                 }
-                Button(Modifier.weight(1f), onClick = { logoPicker.launch(arrayOf("image/*")) }) {
+                Button(onClick = { logoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
                     Text(if (logoBitmap == null) "2. Logo" else "Change Logo", fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(Modifier.weight(1f), onClick = { socialsPicker.launch(arrayOf("image/*")) }) {
+                Button(onClick = { socialsPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
                     Text(if (socialsBitmap == null) "3. Social Icons" else "Change Socials", fontWeight = FontWeight.Bold)
                 }
-                Button(Modifier.weight(1f), onClick = { showTextPopup = true }) {
+                Button(onClick = { showTextPopup = true }, modifier = Modifier.weight(1f)) {
                     Text("4. Headline", fontWeight = FontWeight.Bold)
                 }
             }
