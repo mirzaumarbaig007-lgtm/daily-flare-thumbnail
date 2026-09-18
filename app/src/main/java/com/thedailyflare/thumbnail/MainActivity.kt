@@ -327,7 +327,18 @@ class MainActivity : ComponentActivity() {
                         fontWeight = FontWeight.Bold
                     )
                 ) { append(word) }
-                if (index < words.lastIndex) append(" ")
+                if (index < words.lastIndex) {
+                    // Keep the real space, but give it the same white background when
+                    // the words on both sides are highlighted so adjacent highlights merge.
+                    withStyle(
+                        androidx.compose.ui.text.SpanStyle(
+                            color = ComposeColor.White,
+                            background = if (index in highlighted && (index + 1) in highlighted)
+                                ComposeColor.White else ComposeColor.Transparent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) { append(" ") }
+                }
             }
         }
 
@@ -546,18 +557,15 @@ class MainActivity : ComponentActivity() {
             val lh = it.height * s
             val x = 48f
             val y = 48f
-            val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(150, 0, 0, 0)
+            // Shadow must be a real drop shadow from the logo itself — never a
+            // fixed black rectangle/background behind it.
+            val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
                 setShadowLayer(14f, 0f, 5f, Color.argb(190, 0, 0, 0))
             }
-            canvas.drawRoundRect(
-                android.graphics.RectF(x - 8f, y - 8f, x + lw + 8f, y + lh + 8f),
-                12f, 12f, shadow
-            )
             canvas.drawBitmap(
                 it, null,
                 android.graphics.RectF(x, y, x + lw, y + lh),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                logoPaint
             )
         }
 
@@ -605,23 +613,48 @@ class MainActivity : ComponentActivity() {
         if (highlighted.isNotEmpty()) {
             val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
             var offset = 0
+            var groupStartOffset = -1
+            var groupEndOffset = -1
+            var groupLine = -1
+
+            fun drawGroup() {
+                if (groupStartOffset < 0 || groupEndOffset < 0 || groupLine < 0) return
+                val x1 = layout.getPrimaryHorizontal(groupStartOffset)
+                val x2 = layout.getPrimaryHorizontal(groupEndOffset)
+                canvas.drawRect(
+                    minOf(x1, x2) - 5f,
+                    layout.getLineTop(groupLine).toFloat(),
+                    maxOf(x1, x2) + 5f,
+                    layout.getLineBottom(groupLine).toFloat(),
+                    highlightPaint
+                )
+                groupStartOffset = -1
+                groupEndOffset = -1
+                groupLine = -1
+            }
+
             words.forEachIndexed { index, word ->
                 val startOffset = offset
                 val endOffset = startOffset + word.length
                 val line = layout.getLineForOffset(startOffset)
-                val x1 = layout.getPrimaryHorizontal(startOffset)
-                val x2 = layout.getPrimaryHorizontal(endOffset)
-                if (index in highlighted) {
-                    canvas.drawRect(
-                        minOf(x1, x2) - 5f,
-                        layout.getLineTop(line).toFloat(),
-                        maxOf(x1, x2) + 5f,
-                        layout.getLineBottom(line).toFloat(),
-                        highlightPaint
-                    )
+                val isHighlighted = index in highlighted
+
+                if (isHighlighted) {
+                    if (groupStartOffset >= 0 && line == groupLine) {
+                        // Include the real space between adjacent highlighted words.
+                        groupEndOffset = endOffset
+                    } else {
+                        drawGroup()
+                        groupStartOffset = startOffset
+                        groupEndOffset = endOffset
+                        groupLine = line
+                    }
+                } else {
+                    drawGroup()
                 }
                 offset += word.length + 1
             }
+            drawGroup()
         }
 
         layout.draw(canvas)
