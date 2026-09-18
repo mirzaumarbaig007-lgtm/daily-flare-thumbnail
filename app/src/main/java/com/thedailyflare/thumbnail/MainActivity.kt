@@ -135,62 +135,113 @@ class MainActivity : ComponentActivity() {
             Text("Daily Flare Thumbnail", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { mainPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
-                    Text(if (mainBitmap == null) "1. Main Image" else "Change Image", fontWeight = FontWeight.Bold)
-                }
-                Button(onClick = { logoPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
-                    Text(if (logoBitmap == null) "2. Logo" else "Change Logo", fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { socialsPicker.launch(arrayOf("image/*")) }, modifier = Modifier.weight(1f)) {
-                    Text(if (socialsBitmap == null) "3. Social Icons" else "Change Socials", fontWeight = FontWeight.Bold)
-                }
-                Button(onClick = { showTextPopup = true }, modifier = Modifier.weight(1f)) {
-                    Text("4. Headline", fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
+            // The four inputs live directly inside the preview at the exact
+            // positions where their final content will appear.
             Box(
-                Modifier.fillMaxWidth().aspectRatio(0.75f).clip(RoundedCornerShape(2.dp))
+                Modifier.fillMaxWidth()
+                    .aspectRatio(0.75f)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(ComposeColor(0xFFEAEAEA))
-                    .clickable(enabled = headline.isNotBlank()) { showTextPopup = true }
             ) {
                 if (mainBitmap == null) {
-                    Text("Select the main image", Modifier.align(Alignment.Center), fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = { mainPicker.launch(arrayOf("image/*")) },
+                        modifier = Modifier.align(Alignment.Center)
+                    ) {
+                        Text("1. Main Image", fontWeight = FontWeight.Bold)
+                    }
                 } else {
                     Image(
-                        mainBitmap!!.asImageBitmap(), "Main image",
-                        Modifier.fillMaxSize(), contentScale = ContentScale.Crop
+                        mainBitmap!!.asImageBitmap(),
+                        "Main image",
+                        Modifier.fillMaxSize().clickable {
+                            mainPicker.launch(arrayOf("image/*"))
+                        },
+                        contentScale = ContentScale.Crop
                     )
+                }
 
-                    logoBitmap?.let {
-                        Image(
-                            it.asImageBitmap(), "Logo",
-                            Modifier.align(Alignment.TopStart).padding(18.dp)
-                                .height(72.dp).width(72.dp),
-                            contentScale = ContentScale.Fit
+                // Logo input occupies its final top-left position.
+                if (logoBitmap == null) {
+                    Button(
+                        onClick = { logoPicker.launch(arrayOf("image/*")) },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(18.dp)
+                            .height(92.dp)
+                            .width(92.dp)
+                    ) {
+                        Text(
+                            "2.\nLogo",
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
+                } else {
+                    Image(
+                        logoBitmap!!.asImageBitmap(),
+                        "Logo",
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(18.dp)
+                            .height(92.dp)
+                            .width(92.dp)
+                            .clickable { logoPicker.launch(arrayOf("image/*")) },
+                        contentScale = ContentScale.Fit
+                    )
+                }
 
+                // Headline input occupies the final bottom text area.
+                if (headline.isBlank()) {
+                    Button(
+                        onClick = { showTextPopup = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(230.dp)
+                            .padding(horizontal = 18.dp, vertical = 18.dp)
+                    ) {
+                        Text(
+                            "4. Headline",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
                     HeadlinePreview(
-                        headline, highlighted,
-                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        headline,
+                        highlighted,
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .clickable { showTextPopup = true }
                     )
+                }
 
-                    socialsBitmap?.let {
-                        Image(
-                            it.asImageBitmap(), "Social icons",
-                            Modifier.align(Alignment.BottomCenter)
-                                .fillMaxWidth().height(62.dp)
-                                .padding(horizontal = 24.dp, vertical = 7.dp),
-                            contentScale = ContentScale.Fit
-                        )
+                // Social input occupies its final bottom strip.
+                if (socialsBitmap == null) {
+                    Button(
+                        onClick = { socialsPicker.launch(arrayOf("image/*")) },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .padding(horizontal = 24.dp, vertical = 7.dp)
+                    ) {
+                        Text("3. Social Icons", fontWeight = FontWeight.Bold)
                     }
+                } else {
+                    Image(
+                        socialsBitmap!!.asImageBitmap(),
+                        "Social icons",
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .padding(horizontal = 24.dp, vertical = 7.dp)
+                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
 
@@ -219,7 +270,7 @@ class MainActivity : ComponentActivity() {
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "1080 × 1440 • bold text • 20% text area • 25% black fade • logo & socials persist",
+                "1080 × 1440 • bold text • 20% text area • 25% black fade • tap each area to change",
                 fontSize = 12.sp
             )
         }
