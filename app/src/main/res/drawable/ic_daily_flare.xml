@@ -3,6 +3,25 @@
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
-    <path android:fillColor="#111111" android:pathData="M4,4h40v40h-40z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M24,8l4.2,11.8L40,20l-9.4,7.2L34,39 24,32.1 14,39l3.4,-11.8L8,20l11.8,-0.2z"/>
+
+    <!-- Premium geometric Daily Flare monogram: interlocking D/F on a deep slate field. -->
+    <path
+        android:fillColor="#172A3A"
+        android:pathData="M4,4h40v40h-40z" />
+
+    <!-- Geometric D -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11,10h10c8.3,0 14,5.3 14,14s-5.7,14 -14,14H11V10z
+            M16,15v18h5c5.3,0 9,-3.1 9,-9s-3.7,-9 -9,-9H16z" />
+
+    <!-- Geometric F, cut through the D to create a single editorial mark. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21,10h16v5H26v6h10v5H26v12h-5V10z" />
+
+    <!-- Precision diagonal accent -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M31,28l5,-5 2.5,2.5 -5,5z" />
 </vector>
