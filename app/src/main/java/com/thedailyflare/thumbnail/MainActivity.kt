@@ -265,9 +265,10 @@ class MainActivity : ComponentActivity() {
                         "Social icons",
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
+                            // Keep the supplied social-image asset intact: 10% side padding,
+                            // exact aspect ratio, no crop and no distortion.
+                            .fillMaxWidth(0.80f)
                             .height(previewSocialHeight)
-                            .padding(horizontal = 0.dp, vertical = 0.dp)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.Fit
                     )
