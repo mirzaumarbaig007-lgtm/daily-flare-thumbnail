@@ -571,22 +571,31 @@ class MainActivity : ComponentActivity() {
             val lh = it.height * s
             val x = 48f
             val y = 48f
-            // Build the shadow from the logo's alpha silhouette. This creates a
-            // soft, dissolving black shadow around the actual logo — never a solid box.
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.BLACK
-                alpha = 175
-                maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-            }
-            val shadowOffset = IntArray(2)
-            val alphaMask = it.extractAlpha(shadowPaint, shadowOffset)
-            canvas.drawBitmap(
-                alphaMask,
-                x + shadowOffset[0] - 1f,
-                y + shadowOffset[1] + 4f,
-                shadowPaint
+            // Create the shadow on an output-sized alpha mask at the EXACT logo
+            // coordinates. Do not use extractAlpha() offsets: those can shift the
+            // shadow away from the logo. The mask is blurred only around the logo
+            // silhouette, so there is no rectangular/center-screen shadow.
+            val shadowMask = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+            val shadowCanvas = Canvas(shadowMask)
+            val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            shadowCanvas.drawBitmap(
+                it, null,
+                android.graphics.RectF(x, y, x + lw, y + lh),
+                maskPaint
             )
-            alphaMask.recycle()
+
+            val blurPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                alpha = 150
+                maskFilter = android.graphics.BlurMaskFilter(
+                    16f,
+                    android.graphics.BlurMaskFilter.Blur.NORMAL
+                )
+            }
+            val blurredShadow = shadowMask.extractAlpha(blurPaint, null)
+            canvas.drawBitmap(blurredShadow, 0f, 0f, blurPaint)
+            blurredShadow.recycle()
+            shadowMask.recycle()
 
             val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             canvas.drawBitmap(
