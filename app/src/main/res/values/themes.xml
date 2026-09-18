@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.DailyFlareThumbnail" parent="android:style/Theme.Material.Light.NoActionBar" />
+</resources>
