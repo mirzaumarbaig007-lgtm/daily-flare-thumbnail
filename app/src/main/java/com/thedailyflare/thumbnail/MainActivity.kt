@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,8 +38,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,8 +64,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -162,41 +164,42 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Logo: small circular selection area at the final top-left position.
-                if (logoBitmap == null) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(18.dp)
-                            .height(82.dp)
-                            .width(82.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .clickable { logoPicker.launch(arrayOf("image/*")) },
-                        color = ComposeColor.White.copy(alpha = 0.88f),
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                "Select\nlogo",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
+                // Logo: larger top-left control with a visible soft shadow.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(18.dp)
+                        .height(116.dp)
+                        .width(116.dp)
+                        .shadow(14.dp, androidx.compose.foundation.shape.CircleShape)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable { logoPicker.launch(arrayOf("image/*")) }
+                        .background(ComposeColor.Black.copy(alpha = 0.28f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (logoBitmap == null) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = ComposeColor.White.copy(alpha = 0.92f),
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    "Select\nlogo",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
                         }
+                    } else {
+                        Image(
+                            logoBitmap!!.asImageBitmap(),
+                            "Logo",
+                            Modifier.fillMaxSize().padding(12.dp),
+                            contentScale = ContentScale.Fit
+                        )
                     }
-                } else {
-                    Image(
-                        logoBitmap!!.asImageBitmap(),
-                        "Logo",
-                        Modifier
-                            .align(Alignment.TopStart)
-                            .padding(18.dp)
-                            .height(82.dp)
-                            .width(82.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .clickable { logoPicker.launch(arrayOf("image/*")) },
-                        contentScale = ContentScale.Fit
-                    )
                 }
 
                 // Headline: click the final text area to open the text/highlight editor.
@@ -318,34 +321,54 @@ class MainActivity : ComponentActivity() {
         modifier: Modifier
     ) {
         if (headline.isBlank()) return
-        val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
 
-        Column(
-            modifier = modifier
-                .background(ComposeColor.Black.copy(alpha = 0.18f))
-                .padding(start = 28.dp, end = 28.dp, top = 18.dp, bottom = 74.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            androidx.compose.foundation.layout.FlowRow(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                words.forEachIndexed { index, word ->
-                    Text(
-                        "$word ",
+        val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        val annotated = buildAnnotatedString {
+            words.forEachIndexed { index, word ->
+                withStyle(
+                    androidx.compose.ui.text.SpanStyle(
                         color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
-                        fontSize = 27.sp,
-                        lineHeight = 31.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .background(
-                                if (index in highlighted) ComposeColor(0xFFFFC107)
-                                else ComposeColor.Transparent,
-                                RoundedCornerShape(3.dp)
-                            )
-                            .padding(horizontal = 2.dp, vertical = 1.dp)
+                        background = if (index in highlighted) ComposeColor(0xFFFFC107) else ComposeColor.Transparent,
+                        fontWeight = FontWeight.Bold
                     )
-                }
+                ) { append(word) }
+                if (index < words.lastIndex) append(" ")
+            }
+        }
+
+        Box(modifier = modifier.fillMaxWidth().height(230.dp)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                ComposeColor.Transparent,
+                                ComposeColor.Black.copy(alpha = 0.72f),
+                                ComposeColor.Black.copy(alpha = 0.96f)
+                            )
+                        )
+                    )
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(155.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(start = 24.dp, end = 24.dp, bottom = 72.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = annotated,
+                    color = ComposeColor.White,
+                    fontSize = 27.sp,
+                    lineHeight = 31.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -380,8 +403,15 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(12.dp))
                     Text("Tap any word to highlight it:", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        itemsIndexed(words) { index, word ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(190.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        words.forEachIndexed { index, word ->
                             FilterChip(
                                 selected = index in selected,
                                 onClick = {
@@ -395,7 +425,7 @@ class MainActivity : ComponentActivity() {
             },
             confirmButton = {
                 TextButton(onClick = { onApply(text.trim(), selected) }) {
-                    Text("Apply", fontWeight = FontWeight.Bold)
+                    Text("Submit", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -425,11 +455,23 @@ class MainActivity : ComponentActivity() {
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
 
         logo?.let {
-            val s = minOf(120f / it.width, 120f / it.height)
+            val box = 178f
+            val cx = 112f
+            val cy = 112f
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(105, 0, 0, 0)
+                setShadowLayer(18f, 0f, 7f, Color.argb(180, 0, 0, 0))
+            }
+            canvas.drawCircle(cx, cy, box / 2f, shadowPaint)
+
+            val s = minOf(150f / it.width, 150f / it.height)
             val lw = it.width * s
             val lh = it.height * s
-            canvas.drawBitmap(it, null, android.graphics.RectF(24f, 24f, 24f + lw, 24f + lh),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+            canvas.drawBitmap(
+                it, null,
+                android.graphics.RectF(cx - lw / 2f, cy - lh / 2f, cx + lw / 2f, cy + lh / 2f),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
         }
 
         // Black fade covers the lower 25%; the headline itself is centered in the bottom 20%.
@@ -444,43 +486,43 @@ class MainActivity : ComponentActivity() {
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
-        val normalPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 60f
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
         val textWidth = 940
-        val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, normalPaint, textWidth)
+        val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
             .setLineSpacing(0f, 1f)
             .build()
 
-        val areaTop = height * 0.80f
-        val areaHeight = height * 0.20f
-        val textTop = areaTop + maxOf(10f, (areaHeight - layout.height) / 2f)
+        // Keep the headline above the social strip, matching the preview.
+        val socialReserve = if (socials != null) 125f else 0f
+        val headlineTop = height * 0.80f
+        val headlineHeight = (height * 0.20f - socialReserve).coerceAtLeast(0f)
+        val textTop = headlineTop + maxOf(0f, (headlineHeight - layout.height) / 2f)
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
 
-        // Highlight rectangles are painted first, then the bold text is painted on top.
         if (highlighted.isNotEmpty()) {
             val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(255, 193, 7)
             }
             var offset = 0
             words.forEachIndexed { index, word ->
-                val start = offset
-                val line = layout.getLineForOffset(start)
-                val lineStart = layout.getLineStart(line)
-                val prefix = fullText.substring(lineStart, start)
-                val x1 = normalPaint.measureText(prefix)
-                val x2 = x1 + normalPaint.measureText(word)
+                val startOffset = offset
+                val endOffset = startOffset + word.length
+                val line = layout.getLineForOffset(startOffset)
+                val x1 = layout.getPrimaryHorizontal(startOffset)
+                val x2 = layout.getPrimaryHorizontal(endOffset)
                 if (index in highlighted) {
                     canvas.drawRect(
-                        x1 - 5f,
+                        minOf(x1, x2) - 5f,
                         layout.getLineTop(line).toFloat() + 2f,
-                        x2 + 5f,
+                        maxOf(x1, x2) + 5f,
                         layout.getLineBottom(line).toFloat() - 2f,
                         highlightPaint
                     )
@@ -492,15 +534,18 @@ class MainActivity : ComponentActivity() {
         layout.draw(canvas)
 
         if (highlighted.isNotEmpty()) {
-            val blackPaint = TextPaint(normalPaint).apply { color = Color.BLACK }
+            val blackPaint = TextPaint(textPaint).apply { color = Color.BLACK }
             var offset = 0
             words.forEachIndexed { index, word ->
+                val startOffset = offset
+                val line = layout.getLineForOffset(startOffset)
                 if (index in highlighted) {
-                    val line = layout.getLineForOffset(offset)
-                    val lineStart = layout.getLineStart(line)
-                    val prefix = fullText.substring(lineStart, offset)
-                    val x = normalPaint.measureText(prefix)
-                    canvas.drawText(word, x, layout.getLineBaseline(line).toFloat(), blackPaint)
+                    canvas.drawText(
+                        word,
+                        layout.getPrimaryHorizontal(startOffset),
+                        layout.getLineBaseline(line).toFloat(),
+                        blackPaint
+                    )
                 }
                 offset += word.length + 1
             }
