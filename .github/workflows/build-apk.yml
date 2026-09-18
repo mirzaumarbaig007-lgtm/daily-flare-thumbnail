@@ -37,6 +37,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish APK to apk-build-output branch
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
