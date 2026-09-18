@@ -278,7 +278,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-                ) { Text("Export 3:4 JPG", fontWeight = FontWeight.Bold) }
+                ) { Text("Export 4:5 JPG", fontWeight = FontWeight.Bold) }
 
                 Spacer(Modifier.width(12.dp))
                 Button(onClick = {
@@ -309,7 +309,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalLayoutApi::class)
     @Composable
     private fun HeadlinePreview(
         headline: String,
@@ -332,12 +331,23 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Box(modifier = modifier.fillMaxWidth().height(270.dp)) {
+        // The headline always owns exactly the bottom 20% of the 4:5 thumbnail.
+        // Font size and line height are derived from the number of wrapped lines.
+        val previewWidthPx = 1080f - 36f
+        val metrics = dynamicHeadlineMetrics(headline, previewWidthPx, 270f)
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val fontSp = with(density) { metrics.textSize.toDp().toSp() }
+        val lineSp = with(density) { metrics.lineHeight.toDp().toSp() }
+
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(270.dp)
+        ) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
-                    .align(Alignment.BottomCenter)
+                    .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -351,16 +361,15 @@ class MainActivity : ComponentActivity() {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(190.dp)
-                    .align(Alignment.BottomCenter)
-                    .padding(start = 18.dp, end = 18.dp, bottom = 78.dp),
+                    .fillMaxSize()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 72.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = annotated,
                     color = ComposeColor.White,
-                    fontSize = 27.sp,
-                    lineHeight = 31.sp,
+                    fontSize = fontSp,
+                    lineHeight = lineSp,
                     fontWeight = FontWeight.Bold,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -368,6 +377,79 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private data class HeadlineMetrics(
+        val textSize: Float,
+        val lineHeight: Float,
+        val lineCount: Int
+    )
+
+    private fun dynamicHeadlineMetrics(
+        text: String,
+        maxWidth: Float,
+        headlineAreaHeight: Float
+    ): HeadlineMetrics {
+        val clean = text.trim()
+        if (clean.isEmpty()) return HeadlineMetrics(1f, headlineAreaHeight, 1)
+
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        }
+
+        // First determine the actual wrapped line count using a width-fitting size.
+        var size = headlineAreaHeight
+        var layout: StaticLayout
+        while (true) {
+            paint.textSize = size
+            layout = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false)
+                .setLineSpacing(0f, 1f)
+                .build()
+            if (layout.lineCount <= 4 || size <= 12f) break
+            size *= 0.9f
+        }
+
+        val targetLines = layout.lineCount.coerceIn(1, 4)
+        val allocatedLineHeight = headlineAreaHeight / targetLines
+
+        // Derive font size from the exact vertical allocation, not a fixed font size.
+        val unitPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = paint.typeface
+            textSize = 1f
+        }
+        val unitMetrics = unitPaint.fontMetrics
+        val fontScale = allocatedLineHeight /
+            (unitMetrics.descent - unitMetrics.ascent).coerceAtLeast(1f)
+        var finalSize = fontScale.coerceAtLeast(8f)
+
+        // Width can force a smaller size, but the line allocation remains targetLines.
+        repeat(8) {
+            paint.textSize = finalSize
+            val check = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false)
+                .setLineSpacing(0f, 1f)
+                .build()
+            if (check.lineCount > targetLines) {
+                finalSize *= 0.94f
+            }
+        }
+
+        paint.textSize = finalSize
+        val finalLayout = StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setIncludePad(false)
+            .setLineSpacing(0f, 1f)
+            .build()
+
+        return HeadlineMetrics(
+            textSize = finalSize,
+            lineHeight = allocatedLineHeight,
+            lineCount = finalLayout.lineCount.coerceAtMost(4)
+        )
+    }
+
     @Composable
     private fun TextHighlightDialog(
         initialText: String,
@@ -480,7 +562,7 @@ class MainActivity : ComponentActivity() {
         // Reference-style black fade rising behind the headline.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, height * 0.62f, 0f, height * 0.88f,
+                0f, height * 0.58f, 0f, height * 0.82f,
                 intArrayOf(
                     Color.TRANSPARENT,
                     Color.argb(190, 0, 0, 0),
@@ -490,29 +572,29 @@ class MainActivity : ComponentActivity() {
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRect(0f, height * 0.55f, width.toFloat(), height.toFloat(), fade)
+        canvas.drawRect(0f, height * 0.52f, width.toFloat(), height.toFloat(), fade)
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
+        // The headline owns exactly the bottom 20%: 270 px of the 1350 px output.
+        // Line allocation is dynamic: 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 25%.
+        val headlineAreaTop = height * 0.80f
+        val headlineAreaHeight = height * 0.20f
+        val textWidth = 1010
+        val metrics = dynamicHeadlineMetrics(fullText, textWidth.toFloat(), headlineAreaHeight)
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 60f
+            textSize = metrics.textSize
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
 
-        // Keep the headline within the same bottom area as the reference.
-        val textWidth = 1010
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
-            .setLineSpacing(0f, 1f)
+            .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
             .build()
 
-        val socialReserve = if (socials != null) 115f else 0f
-        val headlineAreaTop = height * 0.76f
-        val headlineAreaBottom = height - socialReserve - 8f
-        val headlineAreaHeight = (headlineAreaBottom - headlineAreaTop).coerceAtLeast(1f)
-        val textTop = headlineAreaTop + maxOf(0f, (headlineAreaHeight - layout.height) / 2f)
+        val textTop = headlineAreaTop + (headlineAreaHeight - metrics.lineHeight * metrics.lineCount) / 2f
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
