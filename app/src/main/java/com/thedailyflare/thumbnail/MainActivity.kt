@@ -407,51 +407,44 @@ class MainActivity : ComponentActivity() {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
 
-        // Find the largest font that naturally wraps the headline into no more than
-        // four lines. StaticLayout wraps at word boundaries, so words fill the current
-        // line until the available width is exhausted, then continue on the next line.
+        // Wrap only at word boundaries. Spaces are kept between words, and a line
+        // is filled as far as possible before the next word moves to the next line.
         fun layoutFor(size: Float): StaticLayout {
             paint.textSize = size
             return StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setIncludePad(false)
+                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
                 .setLineSpacing(0f, 1f)
                 .build()
         }
 
+        // Find a size that fits the headline into the maximum four lines.
         var low = 8f
         var high = headlineAreaHeight
-        repeat(18) {
+        repeat(20) {
             val mid = (low + high) / 2f
-            val layout = layoutFor(mid)
-            val fontHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-            if (layout.lineCount <= 4 && fontHeight <= headlineAreaHeight) {
-                low = mid
-            } else {
-                high = mid
-            }
+            val test = layoutFor(mid)
+            if (test.lineCount <= 4) low = mid else high = mid
         }
 
         var finalSize = low
         var layout = layoutFor(finalSize)
-        var lineCount = layout.lineCount.coerceIn(1, 4)
+        var lineCount = layout.lineCount
 
-        // Each wrapped line gets exactly its share of the bottom 20% area.
-        val allocatedLineHeight = headlineAreaHeight / lineCount
-
-        // If the 4-line result is too tall for its allocated vertical slot, reduce
-        // the font until its actual glyph height fits that slot without changing
-        // word-based wrapping.
-        repeat(12) {
+        // For the actual line count, each line gets an equal share of the 20% area.
+        // Reduce only when glyph height would exceed that allocated line slot.
+        repeat(20) {
+            val allocated = headlineAreaHeight / lineCount.coerceAtLeast(1)
             paint.textSize = finalSize
             val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-            if (glyphHeight <= allocatedLineHeight) return@repeat
+            if (glyphHeight <= allocated) return@repeat
             finalSize *= 0.96f
             layout = layoutFor(finalSize)
-            lineCount = layout.lineCount.coerceIn(1, 4)
+            lineCount = layout.lineCount
         }
 
-        // Recalculate after any size adjustment.
         layout = layoutFor(finalSize)
         lineCount = layout.lineCount.coerceIn(1, 4)
 
