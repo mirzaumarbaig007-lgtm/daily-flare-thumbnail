@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -487,27 +488,33 @@ class MainActivity : ComponentActivity() {
                         },
                         Modifier.fillMaxWidth(),
                         label = { Text("Headline", fontWeight = FontWeight.Bold) },
-                        minLines = 3
+                        minLines = 2,
+                        maxLines = 4
                     )
                     Spacer(Modifier.height(12.dp))
                     Text("Tap any word to highlight it:", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(190.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        horizontalAlignment = Alignment.Start
+                            .heightIn(min = 56.dp, max = 150.dp)
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        words.forEachIndexed { index, word ->
-                            FilterChip(
-                                selected = index in selected,
-                                onClick = {
-                                    selected = if (index in selected) selected - index else selected + index
-                                },
-                                label = { Text(word, fontWeight = FontWeight.Bold) }
-                            )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            maxItemsInEachRow = Int.MAX_VALUE
+                        ) {
+                            words.forEachIndexed { index, word ->
+                                FilterChip(
+                                    selected = index in selected,
+                                    onClick = {
+                                        selected = if (index in selected) selected - index else selected + index
+                                    },
+                                    label = { Text(word, fontWeight = FontWeight.Bold) }
+                                )
+                            }
                         }
                     }
                 }
