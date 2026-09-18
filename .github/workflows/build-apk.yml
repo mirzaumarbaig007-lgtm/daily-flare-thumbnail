@@ -44,6 +44,6 @@ jobs:
           git checkout -B apk-build-output
           mkdir -p builds
           cp app/build/outputs/apk/debug/app-debug.apk builds/Daily-Flare-Thumbnail.apk
-          git add builds/Daily-Flare-Thumbnail.apk
+          git add -f builds/Daily-Flare-Thumbnail.apk
           git commit -m "Update APK build output" || true
           git push origin apk-build-output --force
