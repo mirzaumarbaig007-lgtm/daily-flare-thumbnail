@@ -227,6 +227,7 @@ class MainActivity : ComponentActivity() {
                     HeadlinePreview(
                         headline,
                         highlighted,
+                        previewHeadlineHeight,
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
