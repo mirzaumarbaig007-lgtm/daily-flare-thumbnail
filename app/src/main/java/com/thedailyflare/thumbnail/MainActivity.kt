@@ -25,7 +25,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shadow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -171,7 +170,6 @@ class MainActivity : ComponentActivity() {
                         .padding(start = 28.dp, top = 24.dp)
                         .height(128.dp)
                         .width(128.dp)
-                        .shadow(12.dp, RoundedCornerShape(8.dp))
                         .clickable { logoPicker.launch(arrayOf("image/*")) },
                     contentAlignment = Alignment.Center
                 ) {
