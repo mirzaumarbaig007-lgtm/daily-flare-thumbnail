@@ -196,7 +196,7 @@ class MainActivity : ComponentActivity() {
                             logoBitmap!!.asImageBitmap(),
                             "Logo",
                             Modifier.fillMaxSize().padding(4.dp),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Fit
                         )
                     }
                 }
@@ -568,9 +568,9 @@ class MainActivity : ComponentActivity() {
             pixels[pixels.lastIndex]
         )
         val bg = intArrayOf(
-            samples.map(Color::red).average().toInt(),
-            samples.map(Color::green).average().toInt(),
-            samples.map(Color::blue).average().toInt()
+            samples.map { Color.red(it) }.average().toInt(),
+            samples.map { Color.green(it) }.average().toInt(),
+            samples.map { Color.blue(it) }.average().toInt()
         )
         var minX = source.width
         var minY = source.height
