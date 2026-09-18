@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
             // There are no separate input buttons above the preview.
             Box(
                 Modifier.fillMaxWidth()
-                    .aspectRatio(0.75f)
+                    .aspectRatio(0.8f)
                     .clip(RoundedCornerShape(2.dp))
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
@@ -164,31 +164,29 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Logo: larger top-left control with a visible soft shadow.
+                // Logo: match the reference output — large, top-left, with a soft shadow.
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(18.dp)
-                        .height(116.dp)
-                        .width(116.dp)
-                        .shadow(14.dp, androidx.compose.foundation.shape.CircleShape)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .clickable { logoPicker.launch(arrayOf("image/*")) }
-                        .background(ComposeColor.Black.copy(alpha = 0.28f)),
+                        .padding(start = 28.dp, top = 24.dp)
+                        .height(128.dp)
+                        .width(128.dp)
+                        .shadow(12.dp, RoundedCornerShape(8.dp))
+                        .clickable { logoPicker.launch(arrayOf("image/*")) },
                     contentAlignment = Alignment.Center
                 ) {
                     if (logoBitmap == null) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
-                            color = ComposeColor.White.copy(alpha = 0.92f),
-                            shape = androidx.compose.foundation.shape.CircleShape
+                            color = ComposeColor.Black.copy(alpha = 0.28f),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    "Select\nlogo",
+                                    "Select logo",
+                                    color = ComposeColor.White,
                                     fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
@@ -196,7 +194,7 @@ class MainActivity : ComponentActivity() {
                         Image(
                             logoBitmap!!.asImageBitmap(),
                             "Logo",
-                            Modifier.fillMaxSize().padding(12.dp),
+                            Modifier.fillMaxSize().padding(4.dp),
                             contentScale = ContentScale.Fit
                         )
                     }
@@ -328,7 +326,7 @@ class MainActivity : ComponentActivity() {
                 withStyle(
                     androidx.compose.ui.text.SpanStyle(
                         color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
-                        background = if (index in highlighted) ComposeColor(0xFFFFC107) else ComposeColor.Transparent,
+                        background = if (index in highlighted) ComposeColor.White else ComposeColor.Transparent,
                         fontWeight = FontWeight.Bold
                     )
                 ) { append(word) }
@@ -336,18 +334,18 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Box(modifier = modifier.fillMaxWidth().height(230.dp)) {
+        Box(modifier = modifier.fillMaxWidth().height(270.dp)) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(150.dp)
+                    .height(210.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
                             listOf(
                                 ComposeColor.Transparent,
-                                ComposeColor.Black.copy(alpha = 0.72f),
-                                ComposeColor.Black.copy(alpha = 0.96f)
+                                ComposeColor.Black.copy(alpha = 0.82f),
+                                ComposeColor.Black.copy(alpha = 0.98f)
                             )
                         )
                     )
@@ -355,9 +353,9 @@ class MainActivity : ComponentActivity() {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(155.dp)
+                    .height(190.dp)
                     .align(Alignment.BottomCenter)
-                    .padding(start = 24.dp, end = 24.dp, bottom = 72.dp),
+                    .padding(start = 18.dp, end = 18.dp, bottom = 78.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -372,7 +370,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
     @Composable
     private fun TextHighlightDialog(
         initialText: String,
@@ -441,45 +438,58 @@ class MainActivity : ComponentActivity() {
         headline: String,
         highlighted: Set<Int>
     ): Bitmap {
+        // Reference output is 4:5, 1080x1350.
         val width = 1080
-        val height = 1440
+        val height = 1350
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
 
+        // Main image: cover-crop exactly like the preview.
         val scale = maxOf(width.toFloat() / source.width, height.toFloat() / source.height)
         val dw = source.width * scale
         val dh = source.height * scale
         val left = (width - dw) / 2f
         val top = (height - dh) / 2f
-        canvas.drawBitmap(source, null, android.graphics.RectF(left, top, left + dw, top + dh),
-            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+        canvas.drawBitmap(
+            source, null,
+            android.graphics.RectF(left, top, left + dw, top + dh),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
 
+        // Large top-left logo with a soft dark shadow.
         logo?.let {
-            val box = 178f
-            val cx = 112f
-            val cy = 112f
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(105, 0, 0, 0)
-                setShadowLayer(18f, 0f, 7f, Color.argb(180, 0, 0, 0))
-            }
-            canvas.drawCircle(cx, cy, box / 2f, shadowPaint)
-
-            val s = minOf(150f / it.width, 150f / it.height)
+            val maxLogo = 150f
+            val s = minOf(maxLogo / it.width, maxLogo / it.height)
             val lw = it.width * s
             val lh = it.height * s
+            val x = 48f
+            val y = 48f
+            val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(150, 0, 0, 0)
+                setShadowLayer(14f, 0f, 5f, Color.argb(190, 0, 0, 0))
+            }
+            canvas.drawRoundRect(
+                android.graphics.RectF(x - 8f, y - 8f, x + lw + 8f, y + lh + 8f),
+                12f, 12f, shadow
+            )
             canvas.drawBitmap(
                 it, null,
-                android.graphics.RectF(cx - lw / 2f, cy - lh / 2f, cx + lw / 2f, cy + lh / 2f),
+                android.graphics.RectF(x, y, x + lw, y + lh),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
         }
 
-        // Black fade covers the lower 25%; the headline itself is centered in the bottom 20%.
+        // Reference-style black fade rising behind the headline.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, height * 0.50f, 0f, height * 0.80f,
-                intArrayOf(Color.TRANSPARENT, Color.argb(235, 0, 0, 0)),
-                floatArrayOf(0f, 1f), Shader.TileMode.CLAMP
+                0f, height * 0.62f, 0f, height * 0.88f,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.argb(190, 0, 0, 0),
+                    Color.argb(250, 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.68f, 1f),
+                Shader.TileMode.CLAMP
             )
         }
         canvas.drawRect(0f, height * 0.55f, width.toFloat(), height.toFloat(), fade)
@@ -491,26 +501,27 @@ class MainActivity : ComponentActivity() {
             textSize = 60f
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
-        val textWidth = 940
+
+        // Keep the headline within the same bottom area as the reference.
+        val textWidth = 1010
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
             .setLineSpacing(0f, 1f)
             .build()
 
-        // Keep the headline above the social strip, matching the preview.
-        val socialReserve = if (socials != null) 125f else 0f
-        val headlineTop = height * 0.80f
-        val headlineHeight = (height * 0.20f - socialReserve).coerceAtLeast(0f)
-        val textTop = headlineTop + maxOf(0f, (headlineHeight - layout.height) / 2f)
+        val socialReserve = if (socials != null) 115f else 0f
+        val headlineAreaTop = height * 0.76f
+        val headlineAreaBottom = height - socialReserve - 8f
+        val headlineAreaHeight = (headlineAreaBottom - headlineAreaTop).coerceAtLeast(1f)
+        val textTop = headlineAreaTop + maxOf(0f, (headlineAreaHeight - layout.height) / 2f)
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
 
+        // Draw exact white highlight rectangles behind selected words.
         if (highlighted.isNotEmpty()) {
-            val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(255, 193, 7)
-            }
+            val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
             var offset = 0
             words.forEachIndexed { index, word ->
                 val startOffset = offset
@@ -521,9 +532,9 @@ class MainActivity : ComponentActivity() {
                 if (index in highlighted) {
                     canvas.drawRect(
                         minOf(x1, x2) - 5f,
-                        layout.getLineTop(line).toFloat() + 2f,
+                        layout.getLineTop(line).toFloat(),
                         maxOf(x1, x2) + 5f,
-                        layout.getLineBottom(line).toFloat() - 2f,
+                        layout.getLineBottom(line).toFloat(),
                         highlightPaint
                     )
                 }
@@ -533,13 +544,14 @@ class MainActivity : ComponentActivity() {
 
         layout.draw(canvas)
 
+        // Redraw selected words in black on their white rectangles.
         if (highlighted.isNotEmpty()) {
             val blackPaint = TextPaint(textPaint).apply { color = Color.BLACK }
             var offset = 0
             words.forEachIndexed { index, word ->
-                val startOffset = offset
-                val line = layout.getLineForOffset(startOffset)
                 if (index in highlighted) {
+                    val startOffset = offset
+                    val line = layout.getLineForOffset(startOffset)
                     canvas.drawText(
                         word,
                         layout.getPrimaryHorizontal(startOffset),
@@ -552,16 +564,20 @@ class MainActivity : ComponentActivity() {
         }
         canvas.restore()
 
+        // Social icons: transparent image only, centered along the very bottom.
         socials?.let {
-            val maxW = 900f
-            val maxH = 105f
+            val maxW = 940f
+            val maxH = 92f
             val s = minOf(maxW / it.width, maxH / it.height)
             val sw = it.width * s
             val sh = it.height * s
             val x = (width - sw) / 2f
-            val y = height - sh - 16f
-            canvas.drawBitmap(it, null, android.graphics.RectF(x, y, x + sw, y + sh),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+            val y = height - sh - 18f
+            canvas.drawBitmap(
+                it, null,
+                android.graphics.RectF(x, y, x + sw, y + sh),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
         }
 
         return output
