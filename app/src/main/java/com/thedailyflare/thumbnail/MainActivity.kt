@@ -125,12 +125,12 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
                 persistUri(uri, "socials_uri")
                 socialsUri = uri.toString()
-                socialsBitmap = loadBitmap(uri)?.let(::trimSocialBitmap)
+                socialsBitmap = loadBitmap(uri)
             }
         }
 
         LaunchedEffect(logoUri) { logoBitmap = loadBitmap(logoUri?.let(Uri::parse)) }
-        LaunchedEffect(socialsUri) { socialsBitmap = loadBitmap(socialsUri?.let(Uri::parse))?.let(::trimSocialBitmap) }
+        LaunchedEffect(socialsUri) { socialsBitmap = loadBitmap(socialsUri?.let(Uri::parse)) }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -211,6 +211,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
                             .padding(horizontal = 18.dp, vertical = 8.dp)
+                            .offset(y = -previewSocialHeight)
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
                         shape = RoundedCornerShape(8.dp)
@@ -232,6 +233,8 @@ class MainActivity : ComponentActivity() {
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
+                            .height(previewHeadlineHeight)
+                            .offset(y = -previewSocialHeight)
                             .clickable { showTextPopup = true }
                     )
                 }
@@ -241,9 +244,8 @@ class MainActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
+                            .fillMaxWidth(0.80f)
                             .height(previewSocialHeight)
-                            .padding(horizontal = 0.dp, vertical = 0.dp)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         color = ComposeColor.White.copy(alpha = 0.88f),
                         shape = RoundedCornerShape(6.dp)
@@ -354,9 +356,10 @@ class MainActivity : ComponentActivity() {
         // The preview uses the same 4:5 geometry as the export: 18dp side margins
         // and exactly 20% of the thumbnail height for the headline.
         val sidePx = with(density) { 18.dp.toPx() }
-        val previewWidthPx = with(density) {
-            (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp).toPx() - sidePx * 2f
+        val screenWidthPx = with(density) {
+            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
         }
+        val previewWidthPx = screenWidthPx - sidePx * 2f
         val metrics = dynamicHeadlineMetrics(headline, previewWidthPx, headlineHeightPx)
         val fontSp = with(density) { metrics.textSize.toSp() }
         val lineSp = with(density) { metrics.lineHeight.toSp() }
@@ -533,83 +536,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun trimSocialBitmap(source: Bitmap): Bitmap {
-        if (source.width <= 1 || source.height <= 1) return source
-
-        // Prefer the alpha bounds for transparent PNG strips.
-        if (source.hasAlpha()) {
-            val pixels = IntArray(source.width * source.height)
-            source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-            var minX = source.width
-            var minY = source.height
-            var maxX = -1
-            var maxY = -1
-            for (y in 0 until source.height) {
-                for (x in 0 until source.width) {
-                    if (Color.alpha(pixels[y * source.width + x]) > 10) {
-                        if (x < minX) minX = x
-                        if (x > maxX) maxX = x
-                        if (y < minY) minY = y
-                        if (y > maxY) maxY = y
-                    }
-                }
-            }
-            if (maxX >= minX && maxY >= minY) {
-                val padX = ((maxX - minX + 1) * 0.04f).toInt()
-                val padY = ((maxY - minY + 1) * 0.12f).toInt()
-                val l = (minX - padX).coerceAtLeast(0)
-                val t = (minY - padY).coerceAtLeast(0)
-                val r = (maxX + padX + 1).coerceAtMost(source.width)
-                val b = (maxY + padY + 1).coerceAtMost(source.height)
-                return Bitmap.createBitmap(source, l, t, r - l, b - t)
-            }
-        }
-
-        // For opaque strips, trim uniform dark/light borders around the actual icons.
-        val pixels = IntArray(source.width * source.height)
-        source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
-        fun luminance(c: Int): Int =
-            (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)).toInt()
-
-        val samples = intArrayOf(
-            pixels[0],
-            pixels[source.width - 1],
-            pixels[(source.height - 1) * source.width],
-            pixels[pixels.lastIndex]
-        )
-        val bg = intArrayOf(
-            samples.map { Color.red(it) }.average().toInt(),
-            samples.map { Color.green(it) }.average().toInt(),
-            samples.map { Color.blue(it) }.average().toInt()
-        )
-        var minX = source.width
-        var minY = source.height
-        var maxX = -1
-        var maxY = -1
-        for (y in 0 until source.height) {
-            for (x in 0 until source.width) {
-                val c = pixels[y * source.width + x]
-                val d = kotlin.math.abs(Color.red(c) - bg[0]) +
-                    kotlin.math.abs(Color.green(c) - bg[1]) +
-                    kotlin.math.abs(Color.blue(c) - bg[2])
-                if (d > 45 || luminance(c) > 80 && bg.all { it < 45 }) {
-                    if (x < minX) minX = x
-                    if (x > maxX) maxX = x
-                    if (y < minY) minY = y
-                    if (y > maxY) maxY = y
-                }
-            }
-        }
-        if (maxX < minX || maxY < minY) return source
-        val padX = ((maxX - minX + 1) * 0.04f).toInt()
-        val padY = ((maxY - minY + 1) * 0.15f).toInt()
-        val l = (minX - padX).coerceAtLeast(0)
-        val t = (minY - padY).coerceAtLeast(0)
-        val r = (maxX + padX + 1).coerceAtMost(source.width)
-        val b = (maxY + padY + 1).coerceAtMost(source.height)
-        return Bitmap.createBitmap(source, l, t, r - l, b - t)
-    }
-
     private fun renderThumbnail(
         source: Bitmap,
         logo: Bitmap?,
@@ -779,23 +705,27 @@ class MainActivity : ComponentActivity() {
         }
         canvas.restore()
 
-        // Social icons occupy the bottom 5% of the thumbnail.
-        // Keep the strip wide so the icons spread across the thumbnail rather than
-        // shrinking into a tiny centered group.
+        // Social icons are one user-provided image asset. Do not crop, trim,
+        // detect, redraw, or otherwise modify its contents. Place the exact image
+        // proportionally inside the bottom 5%, with 10% padding on each side.
         socials?.let {
             val socialAreaHeight = height * 0.05f
-            val y = height - socialAreaHeight
-            val scale = width.toFloat() / it.width.toFloat()
-            val scaledHeight = it.height * scale
-            val top = y + (socialAreaHeight - scaledHeight) / 2f
-            canvas.save()
-            canvas.clipRect(0f, y, width.toFloat(), height.toFloat())
+            val sidePadding = width * 0.10f
+            val targetWidth = width - (sidePadding * 2f)
+            val targetHeight = socialAreaHeight
+            val scale = minOf(
+                targetWidth / it.width.toFloat(),
+                targetHeight / it.height.toFloat()
+            )
+            val sw = it.width * scale
+            val sh = it.height * scale
+            val x = (width - sw) / 2f
+            val y = height - socialAreaHeight + (socialAreaHeight - sh) / 2f
             canvas.drawBitmap(
                 it, null,
-                android.graphics.RectF(0f, top, width.toFloat(), top + scaledHeight),
+                android.graphics.RectF(x, y, x + sw, y + sh),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
-            canvas.restore()
         }
 
         return output
