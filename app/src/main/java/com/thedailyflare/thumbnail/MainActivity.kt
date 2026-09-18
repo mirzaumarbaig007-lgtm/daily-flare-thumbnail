@@ -135,20 +135,21 @@ class MainActivity : ComponentActivity() {
             Text("Daily Flare Thumbnail", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
 
-            // The four inputs live directly inside the preview at the exact
-            // positions where their final content will appear.
+            // All four inputs are interactive areas inside the thumbnail preview.
+            // There are no separate input buttons above the preview.
             Box(
                 Modifier.fillMaxWidth()
                     .aspectRatio(0.75f)
                     .clip(RoundedCornerShape(2.dp))
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
+                // Main image: a centered + button until an image is selected.
                 if (mainBitmap == null) {
                     Button(
                         onClick = { mainPicker.launch(arrayOf("image/*")) },
                         modifier = Modifier.align(Alignment.Center)
                     ) {
-                        Text("1. Main Image", fontWeight = FontWeight.Bold)
+                        Text("＋", fontSize = 32.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Image(
@@ -161,21 +162,27 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Logo input occupies its final top-left position.
+                // Logo: small circular selection area at the final top-left position.
                 if (logoBitmap == null) {
-                    Button(
-                        onClick = { logoPicker.launch(arrayOf("image/*")) },
+                    Surface(
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(18.dp)
-                            .height(92.dp)
-                            .width(92.dp)
+                            .height(82.dp)
+                            .width(82.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .clickable { logoPicker.launch(arrayOf("image/*")) },
+                        color = ComposeColor.White.copy(alpha = 0.88f),
+                        shape = androidx.compose.foundation.shape.CircleShape
                     ) {
-                        Text(
-                            "2.\nLogo",
-                            fontWeight = FontWeight.Bold,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Select\nlogo",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
                     }
                 } else {
                     Image(
@@ -184,28 +191,34 @@ class MainActivity : ComponentActivity() {
                         Modifier
                             .align(Alignment.TopStart)
                             .padding(18.dp)
-                            .height(92.dp)
-                            .width(92.dp)
+                            .height(82.dp)
+                            .width(82.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
                             .clickable { logoPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.Fit
                     )
                 }
 
-                // Headline input occupies the final bottom text area.
+                // Headline: click the final text area to open the text/highlight editor.
                 if (headline.isBlank()) {
-                    Button(
-                        onClick = { showTextPopup = true },
+                    Surface(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(230.dp)
                             .padding(horizontal = 18.dp, vertical = 18.dp)
+                            .clickable { showTextPopup = true },
+                        color = ComposeColor.Black.copy(alpha = 0.28f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(
-                            "4. Headline",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Tap to add headline",
+                                color = ComposeColor.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 } else {
                     HeadlinePreview(
@@ -218,17 +231,25 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Social input occupies its final bottom strip.
+                // Social icons: a small bottom strip in their final position.
                 if (socialsBitmap == null) {
-                    Button(
-                        onClick = { socialsPicker.launch(arrayOf("image/*")) },
+                    Surface(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(72.dp)
                             .padding(horizontal = 24.dp, vertical = 7.dp)
+                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
+                        color = ComposeColor.White.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
-                        Text("3. Social Icons", fontWeight = FontWeight.Bold)
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Select your social icons",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 } else {
                     Image(
@@ -270,7 +291,7 @@ class MainActivity : ComponentActivity() {
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "1080 × 1440 • bold text • 20% text area • 25% black fade • tap each area to change",
+                "Tap logo • + for main image • headline area for text • social strip for icons",
                 fontSize = 12.sp
             )
         }
