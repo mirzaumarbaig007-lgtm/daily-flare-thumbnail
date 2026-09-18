@@ -28,6 +28,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -122,12 +123,12 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
                 persistUri(uri, "socials_uri")
                 socialsUri = uri.toString()
-                socialsBitmap = loadBitmap(uri)
+                socialsBitmap = loadBitmap(uri)?.let(::trimSocialBitmap)
             }
         }
 
         LaunchedEffect(logoUri) { logoBitmap = loadBitmap(logoUri?.let(Uri::parse)) }
-        LaunchedEffect(socialsUri) { socialsBitmap = loadBitmap(socialsUri?.let(Uri::parse)) }
+        LaunchedEffect(socialsUri) { socialsBitmap = loadBitmap(socialsUri?.let(Uri::parse))?.let(::trimSocialBitmap) }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -138,12 +139,14 @@ class MainActivity : ComponentActivity() {
 
             // All four inputs are interactive areas inside the thumbnail preview.
             // There are no separate input buttons above the preview.
-            Box(
+            BoxWithConstraints(
                 Modifier.fillMaxWidth()
                     .aspectRatio(0.8f)
                     .clip(RoundedCornerShape(2.dp))
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
+                val previewHeadlineHeight = maxHeight * 0.20f
+                val previewSocialHeight = maxHeight * 0.05f
                 // Main image: a centered + button until an image is selected.
                 if (mainBitmap == null) {
                     Button(
@@ -193,7 +196,7 @@ class MainActivity : ComponentActivity() {
                             logoBitmap!!.asImageBitmap(),
                             "Logo",
                             Modifier.fillMaxSize().padding(4.dp),
-                            contentScale = ContentScale.Fit
+                            contentScale = ContentScale.Crop
                         )
                     }
                 }
@@ -204,8 +207,8 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(230.dp)
-                            .padding(horizontal = 18.dp, vertical = 18.dp)
+                            .height(previewHeadlineHeight)
+                            .padding(horizontal = 18.dp, vertical = 8.dp)
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
                         shape = RoundedCornerShape(8.dp)
@@ -236,7 +239,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(67.5.dp)
+                            .height(previewSocialHeight)
                             .padding(horizontal = 0.dp, vertical = 0.dp)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         color = ComposeColor.White.copy(alpha = 0.88f),
@@ -257,8 +260,8 @@ class MainActivity : ComponentActivity() {
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(67.5.dp)
-                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                            .height(previewSocialHeight)
+                            .padding(horizontal = 0.dp, vertical = 0.dp)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.Fit
                     )
@@ -313,6 +316,7 @@ class MainActivity : ComponentActivity() {
     private fun HeadlinePreview(
         headline: String,
         highlighted: Set<Int>,
+        headlineHeight: androidx.compose.ui.unit.Dp,
         modifier: Modifier
     ) {
         if (headline.isBlank()) return
@@ -328,8 +332,8 @@ class MainActivity : ComponentActivity() {
                     )
                 ) { append(word) }
                 if (index < words.lastIndex) {
-                    // Keep the real space, but give it the same white background when
-                    // the words on both sides are highlighted so adjacent highlights merge.
+                    // Preserve the real space. When adjacent words are highlighted,
+                    // the white highlight continues through that space so the blocks merge.
                     withStyle(
                         androidx.compose.ui.text.SpanStyle(
                             color = ComposeColor.White,
@@ -342,22 +346,25 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // The headline always owns exactly the bottom 20% of the 4:5 thumbnail.
-        // Font size and line height are derived from the number of wrapped lines.
-        val previewWidthPx = 1080f - 36f
-        val metrics = dynamicHeadlineMetrics(headline, previewWidthPx, 270f)
         val density = androidx.compose.ui.platform.LocalDensity.current
-        val fontSp = with(density) { metrics.textSize.toDp().toSp() }
-        val lineSp = with(density) { metrics.lineHeight.toDp().toSp() }
+        val headlineHeightPx = with(density) { headlineHeight.toPx() }
+        // The preview uses the same 4:5 geometry as the export: 18dp side margins
+        // and exactly 20% of the thumbnail height for the headline.
+        val sidePx = with(density) { 18.dp.toPx() }
+        val previewWidthPx = with(density) {
+            (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp).toPx() - sidePx * 2f
+        }
+        val metrics = dynamicHeadlineMetrics(headline, previewWidthPx, headlineHeightPx)
+        val fontSp = with(density) { metrics.textSize.toSp() }
+        val lineSp = with(density) { metrics.lineHeight.toSp() }
 
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(270.dp)
+                .height(headlineHeight)
         ) {
             Box(
                 Modifier
-                    .fillMaxWidth()
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
@@ -371,9 +378,8 @@ class MainActivity : ComponentActivity() {
             )
             Box(
                 Modifier
-                    .fillMaxWidth()
                     .fillMaxSize()
-                    .padding(start = 18.dp, end = 18.dp, bottom = 72.dp),
+                    .padding(start = 18.dp, end = 18.dp, top = 0.dp, bottom = 0.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -517,6 +523,83 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun trimSocialBitmap(source: Bitmap): Bitmap {
+        if (source.width <= 1 || source.height <= 1) return source
+
+        // Prefer the alpha bounds for transparent PNG strips.
+        if (source.hasAlpha()) {
+            val pixels = IntArray(source.width * source.height)
+            source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
+            var minX = source.width
+            var minY = source.height
+            var maxX = -1
+            var maxY = -1
+            for (y in 0 until source.height) {
+                for (x in 0 until source.width) {
+                    if (Color.alpha(pixels[y * source.width + x]) > 10) {
+                        if (x < minX) minX = x
+                        if (x > maxX) maxX = x
+                        if (y < minY) minY = y
+                        if (y > maxY) maxY = y
+                    }
+                }
+            }
+            if (maxX >= minX && maxY >= minY) {
+                val padX = ((maxX - minX + 1) * 0.04f).toInt()
+                val padY = ((maxY - minY + 1) * 0.12f).toInt()
+                val l = (minX - padX).coerceAtLeast(0)
+                val t = (minY - padY).coerceAtLeast(0)
+                val r = (maxX + padX + 1).coerceAtMost(source.width)
+                val b = (maxY + padY + 1).coerceAtMost(source.height)
+                return Bitmap.createBitmap(source, l, t, r - l, b - t)
+            }
+        }
+
+        // For opaque strips, trim uniform dark/light borders around the actual icons.
+        val pixels = IntArray(source.width * source.height)
+        source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
+        fun luminance(c: Int): Int =
+            (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)).toInt()
+
+        val samples = intArrayOf(
+            pixels[0],
+            pixels[source.width - 1],
+            pixels[(source.height - 1) * source.width],
+            pixels[pixels.lastIndex]
+        )
+        val bg = intArrayOf(
+            samples.map(Color::red).average().toInt(),
+            samples.map(Color::green).average().toInt(),
+            samples.map(Color::blue).average().toInt()
+        )
+        var minX = source.width
+        var minY = source.height
+        var maxX = -1
+        var maxY = -1
+        for (y in 0 until source.height) {
+            for (x in 0 until source.width) {
+                val c = pixels[y * source.width + x]
+                val d = kotlin.math.abs(Color.red(c) - bg[0]) +
+                    kotlin.math.abs(Color.green(c) - bg[1]) +
+                    kotlin.math.abs(Color.blue(c) - bg[2])
+                if (d > 45 || luminance(c) > 80 && bg.all { it < 45 }) {
+                    if (x < minX) minX = x
+                    if (x > maxX) maxX = x
+                    if (y < minY) minY = y
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+        if (maxX < minX || maxY < minY) return source
+        val padX = ((maxX - minX + 1) * 0.04f).toInt()
+        val padY = ((maxY - minY + 1) * 0.15f).toInt()
+        val l = (minX - padX).coerceAtLeast(0)
+        val t = (minY - padY).coerceAtLeast(0)
+        val r = (maxX + padX + 1).coerceAtMost(source.width)
+        val b = (maxY + padY + 1).coerceAtMost(source.height)
+        return Bitmap.createBitmap(source, l, t, r - l, b - t)
+    }
+
     private fun renderThumbnail(
         source: Bitmap,
         logo: Bitmap?,
@@ -550,11 +633,24 @@ class MainActivity : ComponentActivity() {
             val lh = it.height * s
             val x = 48f
             val y = 48f
-            // Shadow must be a real drop shadow from the logo itself — never a
-            // fixed black rectangle/background behind it.
-            val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                setShadowLayer(14f, 0f, 5f, Color.argb(190, 0, 0, 0))
+            // Build the shadow from the logo's alpha silhouette. This creates a
+            // soft, dissolving black shadow around the actual logo — never a solid box.
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                alpha = 175
+                maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
             }
+            val shadowOffset = IntArray(2)
+            val alphaMask = it.extractAlpha(shadowPaint, shadowOffset)
+            canvas.drawBitmap(
+                alphaMask,
+                x + shadowOffset[0] - 1f,
+                y + shadowOffset[1] + 4f,
+                shadowPaint
+            )
+            alphaMask.recycle()
+
+            val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             canvas.drawBitmap(
                 it, null,
                 android.graphics.RectF(x, y, x + lw, y + lh),
@@ -679,11 +775,17 @@ class MainActivity : ComponentActivity() {
         socials?.let {
             val socialAreaHeight = height * 0.05f
             val y = height - socialAreaHeight
+            val scale = width.toFloat() / it.width.toFloat()
+            val scaledHeight = it.height * scale
+            val top = y + (socialAreaHeight - scaledHeight) / 2f
+            canvas.save()
+            canvas.clipRect(0f, y, width.toFloat(), height.toFloat())
             canvas.drawBitmap(
                 it, null,
-                android.graphics.RectF(0f, y, width.toFloat(), height.toFloat()),
+                android.graphics.RectF(0f, top, width.toFloat(), top + scaledHeight),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
+            canvas.restore()
         }
 
         return output
