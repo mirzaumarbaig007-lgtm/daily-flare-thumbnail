@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(67.5.dp)
-                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                            .padding(horizontal = 0.dp, vertical = 0.dp)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         color = ComposeColor.White.copy(alpha = 0.88f),
                         shape = RoundedCornerShape(6.dp)
@@ -572,7 +572,7 @@ class MainActivity : ComponentActivity() {
         // Reference-style black fade rising behind the headline.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, height * 0.58f, 0f, height * 0.82f,
+                0f, height * 0.48f, 0f, height * 0.92f,
                 intArrayOf(
                     Color.TRANSPARENT,
                     Color.argb(190, 0, 0, 0),
@@ -582,13 +582,14 @@ class MainActivity : ComponentActivity() {
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRect(0f, height * 0.52f, width.toFloat(), height.toFloat(), fade)
+        canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
         // The headline owns exactly the bottom 20%: 270 px of the 1350 px output.
         // Line allocation is dynamic: 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 25%.
-        val headlineAreaTop = height * 0.80f
+        val socialAreaHeight = height * 0.05f
+        val headlineAreaTop = height * 0.75f
         val headlineAreaHeight = height * 0.20f
         val textWidth = 1010
         val metrics = dynamicHeadlineMetrics(fullText, textWidth.toFloat(), headlineAreaHeight)
@@ -684,17 +685,10 @@ class MainActivity : ComponentActivity() {
         // shrinking into a tiny centered group.
         socials?.let {
             val socialAreaHeight = height * 0.05f
-            val sideMargin = 24f
-            val maxW = width - (sideMargin * 2f)
-            val maxH = socialAreaHeight - 8f
-            val s = minOf(maxW / it.width, maxH / it.height)
-            val sw = it.width * s
-            val sh = it.height * s
-            val x = (width - sw) / 2f
-            val y = height - socialAreaHeight + (socialAreaHeight - sh) / 2f
+            val y = height - socialAreaHeight
             canvas.drawBitmap(
                 it, null,
-                android.graphics.RectF(x, y, x + sw, y + sh),
+                android.graphics.RectF(0f, y, width.toFloat(), height.toFloat()),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
         }
