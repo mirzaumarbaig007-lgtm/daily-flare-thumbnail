@@ -4,24 +4,29 @@
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- Premium geometric Daily Flare monogram: interlocking D/F on a deep slate field. -->
+    <!-- Abstract geometric app mark: no TDF lettering. -->
     <path
-        android:fillColor="#172A3A"
+        android:fillColor="#0B1220"
         android:pathData="M4,4h40v40h-40z" />
 
-    <!-- Geometric D -->
+    <!-- Interlocking cool-toned diamond geometry. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M11,10h10c8.3,0 14,5.3 14,14s-5.7,14 -14,14H11V10z
-            M16,15v18h5c5.3,0 9,-3.1 9,-9s-3.7,-9 -9,-9H16z" />
+        android:fillColor="#27D3C2"
+        android:pathData="M24,7L41,24L24,41L7,24Z
+            M24,13L13,24L24,35L35,24Z" />
 
-    <!-- Geometric F, cut through the D to create a single editorial mark. -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M21,10h16v5H26v6h10v5H26v12h-5V10z" />
+        android:fillColor="#5B6CFF"
+        android:pathData="M24,11L37,24L24,37L11,24Z
+            M24,17L17,24L24,31L31,24Z" />
 
-    <!-- Precision diagonal accent -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M31,28l5,-5 2.5,2.5 -5,5z" />
+        android:fillColor="#B26BFF"
+        android:pathData="M24,15L33,24L24,33L15,24Z
+            M24,21L21,24L24,27L27,24Z" />
+
+    <!-- Clean central aperture for a precise geometric finish. -->
+    <path
+        android:fillColor="#0B1220"
+        android:pathData="M24,21L27,24L24,27L21,24Z" />
 </vector>
