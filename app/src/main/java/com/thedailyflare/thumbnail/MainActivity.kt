@@ -150,18 +150,17 @@ class MainActivity : ComponentActivity() {
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
                         )
 
-                        drawContext.canvas.nativeCanvas.drawText(
-                            "DF",
-                            29f,
-                            61f,
-                            Paint().apply {
-                                color = Color.WHITE
-                                textSize = 30f
-                                typeface = Typeface.DEFAULT_BOLD
-                                isAntiAlias = true
-                            }
-                        )
                     }
+
+                    Text(
+                        text = "DF",
+                        color = ComposeColor.White,
+                        fontSize = 24.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 32.dp, top = 31.dp)
+                    )
 
                     if (headline.isNotBlank()) {
                         Text(
