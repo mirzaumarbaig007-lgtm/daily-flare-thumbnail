@@ -282,7 +282,7 @@ class MainActivity : ComponentActivity() {
                     }
                     XmlPullParser.END_TAG -> if (parser.name.equals("item", true) || parser.name.equals("entry", true)) {
                         if (title.isNotBlank() && link.isNotBlank()) articles += RssArticle(title.take(240), link, imageUrl)
-                        if (articles.size >= 30) return@try articles
+                        if (articles.size >= 30) return articles
                         insideItem = false
                     }
                 }
