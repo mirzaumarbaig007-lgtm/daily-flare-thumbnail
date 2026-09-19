@@ -75,8 +75,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.platform.ComposeView
-import android.view.View
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -323,22 +321,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun renderSocialIconsBitmap(width: Int, height: Int): Bitmap {
-        val composeView = ComposeView(this)
-        composeView.setContent {
-            SocialIconsRow(
-                modifier = Modifier.fillMaxSize(),
-                iconSizePx = 34f
-            )
-        }
-        composeView.measure(
-            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
-        )
-        composeView.layout(0, 0, width, height)
+        // Export the same bundled vector artwork without creating a ComposeView.
+        // This avoids lifecycle/window dependencies that can crash during export.
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.TRANSPARENT)
-        composeView.draw(Canvas(bitmap))
-        composeView.disposeComposition()
+        val drawable = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.social_icons_white)
+            ?: return bitmap
+        val iconHeight = 34
+        val iconWidth = (168f * iconHeight / 24f).toInt()
+        drawable.setBounds(
+            (width - iconWidth) / 2,
+            height - iconHeight,
+            (width - iconWidth) / 2 + iconWidth,
+            height
+        )
+        drawable.draw(Canvas(bitmap))
         return bitmap
     }
 
