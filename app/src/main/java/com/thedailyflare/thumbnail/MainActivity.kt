@@ -365,6 +365,7 @@ class MainActivity : ComponentActivity() {
         var rssError by remember { mutableStateOf<String?>(null) }
         var showRssDialog by remember { mutableStateOf(false) }
         var selectedArticleTitle by rememberSaveable { mutableStateOf<String?>(null) }
+        val exportScope = rememberCoroutineScope()
 
         val mainPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
@@ -579,12 +580,31 @@ class MainActivity : ComponentActivity() {
                 Button(
                     enabled = mainBitmap != null,
                     onClick = {
-                        mainBitmap?.let {
-                            val title = headline.trim().ifBlank { "Daily Flare" }
-                            saveThumbnail(
-                                renderThumbnail(it, logoBitmap, title, highlighted, logoPosition),
-                                title
-                            )
+                        val source = mainBitmap ?: return@Button
+                        val title = headline.trim().ifBlank { "Daily Flare" }
+                        val readyPreview = previewBitmap
+
+                        exportScope.launch(Dispatchers.Default) {
+                            val bitmapToSave = readyPreview ?: try {
+                                renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
+                            } catch (_: OutOfMemoryError) {
+                                null
+                            } catch (_: Exception) {
+                                null
+                            }
+
+                            if (bitmapToSave == null) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Export could not be rendered. Try selecting the image again.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                return@launch
+                            }
+
+                            saveThumbnail(bitmapToSave, title)
                         }
                     }
                 ) { Text("Export 4:5 JPG", fontWeight = FontWeight.Bold) }
@@ -1429,11 +1449,22 @@ class MainActivity : ComponentActivity() {
             }
 
         try {
-            contentResolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
-            Toast.makeText(this, "Thumbnail saved to Pictures/Daily Flare", Toast.LENGTH_LONG).show()
+            val success = contentResolver.openOutputStream(uri)?.use {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
+            } ?: false
+
+            if (success) {
+                Toast.makeText(this, "Thumbnail saved to Pictures/Daily Flare", Toast.LENGTH_LONG).show()
+            } else {
+                contentResolver.delete(uri, null, null)
+                Toast.makeText(this, "Export failed: Could not write image.", Toast.LENGTH_LONG).show()
+            }
+        } catch (_: OutOfMemoryError) {
+            contentResolver.delete(uri, null, null)
+            Toast.makeText(this, "Export ran out of memory. Try again.", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             contentResolver.delete(uri, null, null)
-            Toast.makeText(this, "Export failed: \${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Export failed: " + (e.message ?: "unknown error"), Toast.LENGTH_LONG).show()
         }
     }
 }
