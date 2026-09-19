@@ -328,7 +328,7 @@ class MainActivity : ComponentActivity() {
         val drawable = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.social_icons_white)
             ?: return bitmap
         val iconHeight = 34
-        val iconWidth = (264f * iconHeight / 24f).toInt()
+        val iconWidth = (504f * iconHeight / 24f).toInt()
         drawable.setBounds(
             (width - iconWidth) / 2,
             height - iconHeight,
@@ -441,8 +441,6 @@ class MainActivity : ComponentActivity() {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
 
-        // Wrap only at word boundaries. Spaces are kept between words, and a line
-        // is filled as far as possible before the next word moves to the next line.
         fun layoutFor(size: Float): StaticLayout {
             paint.textSize = size
             return StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
@@ -454,36 +452,53 @@ class MainActivity : ComponentActivity() {
                 .build()
         }
 
-        // Find a size that fits the headline into the maximum four lines.
+        // Find the largest readable size that stays within four word-wrapped lines.
         var low = 8f
         var high = headlineAreaHeight
-        repeat(20) {
+        repeat(24) {
             val mid = (low + high) / 2f
-            val test = layoutFor(mid)
-            if (test.lineCount <= 4) low = mid else high = mid
+            if (layoutFor(mid).lineCount <= 4) low = mid else high = mid
         }
 
-        var finalSize = low
-        var layout = layoutFor(finalSize)
-        var lineCount = layout.lineCount
+        var size = low
+        var layout = layoutFor(size)
+        var lineCount = layout.lineCount.coerceIn(1, 4)
 
-        // For the actual line count, each line gets an equal share of the 20% area.
-        // Reduce only when glyph height would exceed that allocated line slot.
-        repeat(20) {
-            val allocated = headlineAreaHeight / lineCount.coerceAtLeast(1)
-            paint.textSize = finalSize
+        // Explicit line-count sizing: each line gets an equal share of the
+        // headline area. More lines therefore produce a smaller font.
+        repeat(32) {
+            val slotHeight = headlineAreaHeight / lineCount
+            paint.textSize = size
             val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-            if (glyphHeight <= allocated) return@repeat
-            finalSize *= 0.96f
-            layout = layoutFor(finalSize)
-            lineCount = layout.lineCount
+            val targetGlyphHeight = slotHeight * 0.84f
+
+            if (glyphHeight > targetGlyphHeight) {
+                size *= targetGlyphHeight / glyphHeight
+            } else {
+                val candidate = layoutFor(size * 1.015f)
+                if (candidate.lineCount <= 4 && candidate.lineCount == lineCount) {
+                    size *= 1.015f
+                } else {
+                    return@repeat
+                }
+            }
+
+            layout = layoutFor(size)
+            lineCount = layout.lineCount.coerceIn(1, 4)
         }
 
-        layout = layoutFor(finalSize)
+        layout = layoutFor(size)
         lineCount = layout.lineCount.coerceIn(1, 4)
 
+        val slotHeight = headlineAreaHeight / lineCount
+        paint.textSize = size
+        val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
+        if (glyphHeight > slotHeight * 0.84f) {
+            size *= (slotHeight * 0.84f) / glyphHeight
+        }
+
         return HeadlineMetrics(
-            textSize = finalSize,
+            textSize = size,
             lineHeight = headlineAreaHeight / lineCount,
             lineCount = lineCount
         )
