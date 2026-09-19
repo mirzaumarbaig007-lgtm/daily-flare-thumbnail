@@ -328,25 +328,6 @@ class MainActivity : ComponentActivity() {
     ) {
         if (headline.isBlank()) return
 
-        // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 15% = 202.5px.
-        // No crop or trim; the bitmap is drawn into the complete social area.
-        socials?.let {
-            val socialAreaTop = height * 0.85f
-            canvas.drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(
-                    0f,
-                    socialAreaTop,
-                    width.toFloat(),
-                    height.toFloat()
-                ),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-        }
-
-
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val annotated = buildAnnotatedString {
             words.forEachIndexed { index, word ->
@@ -685,6 +666,24 @@ class MainActivity : ComponentActivity() {
             )
         }
         canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
+
+        // Social icons use the complete user-provided asset across the
+        // full 1080px output width and the exact bottom 15% = 202.5px.
+        // No crop or trim; the bitmap is drawn into the complete social area.
+        socials?.let {
+            val socialAreaTop = height * 0.85f
+            canvas.drawBitmap(
+                it,
+                null,
+                android.graphics.RectF(
+                    0f,
+                    socialAreaTop,
+                    width.toFloat(),
+                    height.toFloat()
+                ),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+        }
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
