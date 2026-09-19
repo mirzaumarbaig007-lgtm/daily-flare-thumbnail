@@ -1345,9 +1345,10 @@ class MainActivity : ComponentActivity() {
         }
 
         val words = headline.take(240).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val textWidth = 900f
-        // Match the reference: bold/wide headline, centered lower on the image,
-        // with enough side breathing room and a compact vertical block.
+        // Use almost the full canvas width. The headline should adapt to the amount
+        // of text instead of being trapped in a narrow fixed 900px column.
+        // 1025px leaves about 2.5% margin on each side of the 1080px canvas.
+        val textWidth = width * 0.949f
         val headlineTop = height * 0.700f
         val headlineBottom = height * 0.880f
         val maxLines = 4
@@ -1355,7 +1356,11 @@ class MainActivity : ComponentActivity() {
         fun makeLines(textSize: Float): List<List<Int>> {
             val measurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.textSize = textSize
-                typeface = try { montserratExtraBoldTypeface } catch (_: Throwable) { Typeface.create("sans-serif", Typeface.BOLD) }
+                typeface = try {
+                    montserratExtraBoldTypeface
+                } catch (_: Throwable) {
+                    Typeface.create("sans-serif", Typeface.BOLD)
+                }
             }
             val lines = mutableListOf<MutableList<Int>>()
             var current = mutableListOf<Int>()
@@ -1377,18 +1382,33 @@ class MainActivity : ComponentActivity() {
             return lines
         }
 
-        var textSize = 82f
+        // Find the largest size that both:
+        // 1) uses the available width naturally (up to ~95%), and
+        // 2) fits within the headline area without forcing an arbitrary font size.
+        var textSize = 54f
         var lines = makeLines(textSize)
-        while (lines.size > maxLines && textSize > 54f) {
-            textSize -= 4f
-            lines = makeLines(textSize)
+        for (candidate in 110 downTo 54) {
+            val candidateLines = makeLines(candidate.toFloat())
+            val candidateLineHeight = candidate * 1.10f
+            val candidateBlockHeight = candidateLines.size * candidateLineHeight
+            if (candidateLines.size <= maxLines &&
+                candidateBlockHeight <= (headlineBottom - headlineTop) * 1.08f
+            ) {
+                textSize = candidate.toFloat()
+                lines = candidateLines
+                break
+            }
         }
         if (lines.size > maxLines) {
             lines = lines.take(maxLines).map { it.toMutableList() }
         }
 
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-            typeface = try { montserratExtraBoldTypeface } catch (_: Throwable) { Typeface.create("sans-serif", Typeface.BOLD) }
+            typeface = try {
+                montserratExtraBoldTypeface
+            } catch (_: Throwable) {
+                Typeface.create("sans-serif", Typeface.BOLD)
+            }
             this.textSize = textSize
             textAlign = Paint.Align.LEFT
         }
