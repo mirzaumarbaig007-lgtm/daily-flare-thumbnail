@@ -71,7 +71,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -212,7 +211,6 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewSocialHeight)
-                            .zIndex(-1f)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         color = ComposeColor.White.copy(alpha = 0.88f),
                         shape = RoundedCornerShape(6.dp)
