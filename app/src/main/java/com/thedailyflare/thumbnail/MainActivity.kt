@@ -138,32 +138,22 @@ class MainActivity : ComponentActivity() {
     // the picker closes. We only need enough detail for the 1080x1350 output.
     private fun loadBitmap(uri: Uri?): Bitmap? {
         if (uri == null) return null
-
         return try {
-            val bounds = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             contentResolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, bounds)
             }
-
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 4096
+            val maxDimension = 2048
             var sampleSize = 1
-            while (
-                bounds.outWidth / sampleSize > maxDimension ||
-                bounds.outHeight / sampleSize > maxDimension
-            ) {
+            while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
             }
-
             val options = BitmapFactory.Options().apply {
                 inSampleSize = sampleSize
-                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inPreferredConfig = Bitmap.Config.RGB_565
             }
-
             contentResolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, options)
             }
@@ -304,24 +294,35 @@ class MainActivity : ComponentActivity() {
     private fun downloadBitmap(url: String?): Bitmap? {
         if (url.isNullOrBlank()) return null
         return try {
-            val first = openHttpConnection(url)
-            val bytes = first.inputStream.use { it.readBytes() }.also { first.disconnect() }
-            if (bytes.isEmpty()) return null
-
+            val boundsConnection = openHttpConnection(url)
+            boundsConnection.connect()
+            if (boundsConnection.responseCode !in 200..299) {
+                boundsConnection.disconnect()
+                return null
+            }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            ByteArrayInputStream(bytes).use { BitmapFactory.decodeStream(it, null, bounds) }
+            boundsConnection.inputStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+            boundsConnection.disconnect()
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 4096
+            val maxDimension = 2048
             var sampleSize = 1
             while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
             }
+
+            val imageConnection = openHttpConnection(url)
+            imageConnection.connect()
+            if (imageConnection.responseCode !in 200..299) {
+                imageConnection.disconnect()
+                return null
+            }
             val options = BitmapFactory.Options().apply {
                 inSampleSize = sampleSize
-                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inPreferredConfig = Bitmap.Config.RGB_565
             }
-            ByteArrayInputStream(bytes).use { BitmapFactory.decodeStream(it, null, options) }
+            imageConnection.inputStream.use { BitmapFactory.decodeStream(it, null, options) }
+                .also { imageConnection.disconnect() }
         } catch (_: OutOfMemoryError) {
             System.gc()
             null
@@ -353,16 +354,34 @@ class MainActivity : ComponentActivity() {
         var selectedArticleTitle by rememberSaveable { mutableStateOf<String?>(null) }
 
         val mainPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) mainBitmap = loadBitmap(uri)
+            if (uri != null) {
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    val bitmap = loadBitmap(uri)
+                    withContext(Dispatchers.Main) {
+                        if (bitmap != null) {
+                            mainBitmap = bitmap
+                        } else {
+                            Toast.makeText(this@MainActivity, "Could not load that image.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
         }
         val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
                 persistUri(uri, "logo_uri")
                 logoUri = uri.toString()
-                logoBitmap = loadLogoBitmap(uri)
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                    val bitmap = loadLogoBitmap(uri)
+                    withContext(Dispatchers.Main) { logoBitmap = bitmap }
+                }
             }
         }
-        LaunchedEffect(logoUri) { logoBitmap = loadLogoBitmap(logoUri?.let(Uri::parse)) }
+        LaunchedEffect(logoUri) {
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                loadLogoBitmap(logoUri?.let(Uri::parse))
+            }.also { logoBitmap = it }
+        }
 
         LaunchedEffect(Unit) {
             rssLoading = true
@@ -383,14 +402,15 @@ class MainActivity : ComponentActivity() {
             showRssDialog = false
             mainBitmap = null
             headline = article.title
-            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-                val bitmap = withContext(Dispatchers.IO) {
-                    downloadBitmap(findFeaturedImageUrl(article))
-                }
-                if (bitmap != null) {
-                    mainBitmap = bitmap
-                } else {
-                    Toast.makeText(this@MainActivity, "Could not load the article image. You can choose one from Gallery.", Toast.LENGTH_LONG).show()
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                val imageUrl = findFeaturedImageUrl(article)
+                val bitmap = downloadBitmap(imageUrl)
+                withContext(Dispatchers.Main) {
+                    if (bitmap != null) {
+                        mainBitmap = bitmap
+                    } else {
+                        Toast.makeText(this@MainActivity, "Could not load the article image. You can choose one from Gallery.", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
