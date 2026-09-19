@@ -747,15 +747,15 @@ class MainActivity : ComponentActivity() {
                     ) {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                             maxItemsInEachRow = Int.MAX_VALUE
                         ) {
                             words.forEachIndexed { index, word ->
                                 val isSelected = index in selected
                                 Surface(
                                     modifier = Modifier
-                                        .height(32.dp)
+                                        .height(28.dp)
                                         .clickable {
                                             selected = if (isSelected) {
                                                 selected - index
@@ -763,7 +763,7 @@ class MainActivity : ComponentActivity() {
                                                 selected + index
                                             }
                                         },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(7.dp),
                                     color = if (isSelected) {
                                         MaterialTheme.colorScheme.primaryContainer
                                     } else {
@@ -778,19 +778,13 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 10.dp)
-                                            .fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            word,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1
-                                        )
-                                    }
+                                    Text(
+                                        word,
+                                        modifier = Modifier.padding(horizontal = 8.dp),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
                                 }
                             }
                         }
