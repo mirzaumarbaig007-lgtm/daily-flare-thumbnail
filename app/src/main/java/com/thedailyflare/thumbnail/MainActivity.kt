@@ -1393,7 +1393,7 @@ class MainActivity : ComponentActivity() {
             textAlign = Paint.Align.LEFT
         }
 
-        val lineHeight = textSize * 1.04f
+        val lineHeight = textSize * 1.10f
         val blockHeight = lines.size * lineHeight
         val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent()
 
@@ -1425,8 +1425,8 @@ class MainActivity : ComponentActivity() {
                         baseline + textPaint.ascent() + verticalPadding,
                         x + wordWidth + horizontalPadding,
                         baseline + textPaint.descent() - verticalPadding,
-                        7f,
-                        7f,
+                        11f,
+                        11f,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
