@@ -397,19 +397,30 @@ class MainActivity : ComponentActivity() {
     ) {
         if (headline.isBlank()) return
 
-        val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val headlineHeightPx = with(density) { headlineHeight.toPx() }
+        val sidePx = with(density) { 18.dp.toPx() }
+        val screenWidthPx = with(density) {
+            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
+        }
+        val previewWidthPx = screenWidthPx - sidePx * 2f
+
+        val wrappedHeadline = wrapHeadlineText(headline, previewWidthPx)
+        val matches = Regex("\\S+").findAll(wrappedHeadline).toList()
+
         val annotated = buildAnnotatedString {
-            words.forEachIndexed { index, word ->
+            matches.forEachIndexed { index, match ->
                 withStyle(
                     androidx.compose.ui.text.SpanStyle(
                         color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
                         background = if (index in highlighted) ComposeColor.White else ComposeColor.Transparent,
                         fontWeight = FontWeight.Bold
                     )
-                ) { append(word) }
-                if (index < words.lastIndex) {
-                    // Preserve the real space. When adjacent words are highlighted,
-                    // the white highlight continues through that space so the blocks merge.
+                ) { append(match.value) }
+
+                if (index < matches.lastIndex) {
+                    val nextStart = matches[index + 1].range.first
+                    val separator = wrappedHeadline.substring(match.range.last + 1, nextStart)
                     withStyle(
                         androidx.compose.ui.text.SpanStyle(
                             color = ComposeColor.White,
@@ -417,21 +428,12 @@ class MainActivity : ComponentActivity() {
                                 ComposeColor.White else ComposeColor.Transparent,
                             fontWeight = FontWeight.Bold
                         )
-                    ) { append(" ") }
+                    ) { append(separator) }
                 }
             }
         }
 
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val headlineHeightPx = with(density) { headlineHeight.toPx() }
-        // The preview uses the same 4:5 geometry as the export: 18dp side margins
-        // and exactly 20% of the thumbnail height for the headline.
-        val sidePx = with(density) { 18.dp.toPx() }
-        val screenWidthPx = with(density) {
-            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
-        }
-        val previewWidthPx = screenWidthPx - sidePx * 2f
-        val metrics = dynamicHeadlineMetrics(headline, previewWidthPx, headlineHeightPx)
+        val metrics = dynamicHeadlineMetrics(wrappedHeadline, previewWidthPx, headlineHeightPx)
         val fontSp = with(density) { metrics.textSize.toSp() }
         val lineSp = with(density) { metrics.lineHeight.toSp() }
 
@@ -478,6 +480,41 @@ class MainActivity : ComponentActivity() {
         val lineCount: Int
     )
 
+    // Establish the natural line count at one stable reference size first.
+    // Then scale the font FROM that line count. This prevents the previous
+    // feedback loop where changing the font changed the line count again.
+    private fun wrapHeadlineText(text: String, maxWidth: Float): String {
+        val clean = text.trim()
+        if (clean.isEmpty()) return ""
+
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            textSize = 64f
+        }
+        val layout = StaticLayout.Builder.obtain(
+            clean, 0, clean.length, paint, maxWidth.toInt()
+        )
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setIncludePad(false)
+            .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+            .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
+            .setLineSpacing(0f, 1f)
+            .build()
+
+        val count = layout.lineCount
+        if (count <= 4) {
+            return (0 until count).joinToString("\n") { line ->
+                clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
+            }
+        }
+
+        val firstThree = (0 until 3).map { line ->
+            clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
+        }
+        val fourth = clean.substring(layout.getLineStart(3)).trim()
+        return (firstThree + fourth).joinToString("\n")
+    }
+
     private fun dynamicHeadlineMetrics(
         text: String,
         maxWidth: Float,
@@ -486,82 +523,18 @@ class MainActivity : ComponentActivity() {
         val clean = text.trim()
         if (clean.isEmpty()) return HeadlineMetrics(1f, headlineAreaHeight, 1)
 
-        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-        }
-
-        fun layoutFor(size: Float): StaticLayout {
-            paint.textSize = size
-            return StaticLayout.Builder.obtain(
-                clean, 0, clean.length, paint, maxWidth.toInt()
-            )
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setIncludePad(false)
-                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
-                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-                .setLineSpacing(0f, 1f)
-                .build()
-        }
-
-        /*
-         * The font size is deliberately tied to the final line count.
-         * We test the four possible designs independently instead of
-         * repeatedly changing the font and chasing a moving line count.
-         *
-         * 1 line -> 100% of the headline zone
-         * 2 lines -> 50% per line
-         * 3 lines -> 33.33% per line
-         * 4 lines -> 24% visual text height per line
-         *
-         * A candidate is valid only when the font size derived for that
-         * line-count slot actually wraps the headline into that same number
-         * of lines. This keeps the relationship deterministic.
-         */
-        val slotFractions = floatArrayOf(1f, 0.5f, 1f / 3f, 0.24f)
-
-        var chosenLines = 4
-        var chosenSize = 1f
-
-        // Prefer the fewest lines that can stably use its assigned slot.
-        for (candidateLines in 1..4) {
-            val slotHeight = headlineAreaHeight / candidateLines
-            // The percentage describes the text scale relative to the full
-            // 20% headline zone, not a second percentage of the per-line slot.
-            // This keeps the intended proportional scaling:
-            // 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 24%.
-            val targetGlyphHeight =
-                headlineAreaHeight * slotFractions[candidateLines - 1] * 0.82f
-
-            paint.textSize = 100f
-            val referenceGlyphHeight =
-                (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
-            val candidateSize =
-                100f * targetGlyphHeight / referenceGlyphHeight
-
-            val actualLines = layoutFor(candidateSize).lineCount
-            if (actualLines == candidateLines) {
-                chosenLines = candidateLines
-                chosenSize = candidateSize
-                break
-            }
-        }
-
-        // If no exact fixed point exists, use the four-line design as the
-        // safe maximum and keep the font tied to that slot.
-        if (chosenSize <= 1f) {
-            val slotHeight = headlineAreaHeight / 4f
-            paint.textSize = 100f
-            val referenceGlyphHeight =
-                (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
-            chosenSize =
-                100f * (headlineAreaHeight * slotFractions[3] * 0.82f) / referenceGlyphHeight
-            chosenLines = 4
+        val lineCount = clean.count { it == '\n' }.plus(1).coerceIn(1, 4)
+        val fraction = when (lineCount) {
+            1 -> 1f
+            2 -> 0.50f
+            3 -> 1f / 3f
+            else -> 0.24f
         }
 
         return HeadlineMetrics(
-            textSize = chosenSize,
-            lineHeight = headlineAreaHeight / chosenLines,
-            lineCount = chosenLines
+            textSize = 64f * fraction,
+            lineHeight = headlineAreaHeight / lineCount,
+            lineCount = lineCount
         )
     }
 
@@ -744,8 +717,9 @@ class MainActivity : ComponentActivity() {
         )
         socialIcons.recycle()
 
-        val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
-        val fullText = words.joinToString(" ")
+        val fullText = wrapHeadlineText(headline, 1010f)
+        val wordMatches = Regex("\\S+").findAll(fullText).toList()
+        val words = wordMatches.map { it.value }
         // The headline owns exactly the bottom 20%: 270 px of the 1350 px output.
         // Line allocation is dynamic: 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 25%.
         val socialAreaHeight = height * 0.05f
@@ -817,9 +791,9 @@ class MainActivity : ComponentActivity() {
                 groupLine = -1
             }
 
-            words.forEachIndexed { index, word ->
-                val startOffset = offset
-                val endOffset = startOffset + word.length
+            wordMatches.forEachIndexed { index, match ->
+                val startOffset = match.range.first
+                val endOffset = match.range.last + 1
                 val line = layout.getLineForOffset(startOffset)
 
                 if (index in highlighted) {
@@ -830,6 +804,16 @@ class MainActivity : ComponentActivity() {
                         groupRight = maxOf(groupRight, right)
                     } else {
                         flushGroup()
+                        groupLeft = minOf(left, right)
+                        groupRight = maxOf(left, right)
+                        groupLine = line
+                        hasGroup = true
+                    }
+                } else {
+                    flushGroup()
+                }
+            }
+            flushGroup()
                         groupLeft = minOf(left, right)
                         groupRight = maxOf(left, right)
                         groupLine = line
@@ -849,20 +833,18 @@ class MainActivity : ComponentActivity() {
         // Redraw selected words in black exactly where StaticLayout placed them.
         if (highlighted.isNotEmpty()) {
             val blackPaint = TextPaint(textPaint).apply { color = Color.BLACK }
-            var offset = 0
-            words.forEachIndexed { index, word ->
+            wordMatches.forEachIndexed { index, match ->
                 if (index in highlighted) {
-                    val startOffset = offset
+                    val startOffset = match.range.first
                     val line = layout.getLineForOffset(startOffset)
                     val x = layout.getPrimaryHorizontal(startOffset)
                     canvas.drawText(
-                        word,
+                        match.value,
                         x,
                         layout.getLineBaseline(line).toFloat(),
                         blackPaint
                     )
                 }
-                offset += word.length + 1
             }
         }
         canvas.restore()
