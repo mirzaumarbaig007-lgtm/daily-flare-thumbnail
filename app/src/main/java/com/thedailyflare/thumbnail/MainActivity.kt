@@ -721,7 +721,7 @@ class MainActivity : ComponentActivity() {
                     android.graphics.BlurMaskFilter.Blur.NORMAL
                 )
             }
-            shadowCanvas.drawBitmap(mask, 0f, 4f, shadowPaint)
+            shadowCanvas.drawBitmap(mask, 0f, 3f, shadowPaint)
 
             canvas.drawBitmap(
                 shadow,
