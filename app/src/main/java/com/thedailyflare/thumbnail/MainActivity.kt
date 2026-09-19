@@ -240,8 +240,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Social icons: keep the complete user-provided asset in its
-                // exact final 1080px-wide / 20%-high area.
+                // Social icons: a small bottom strip in their final position.
                 if (socialsBitmap == null) {
                     Surface(
                         modifier = Modifier
@@ -269,30 +268,11 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .height(previewSocialHeight)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
+                        // Social asset occupies the full 1080px canvas width and
+                        // exactly the bottom 20% (270px) of the 1350px output.
                         contentScale = ContentScale.FillBounds
                     )
                 }
-
-                // One continuous fade overlays both the photo and social area.
-                // This removes the visible boundary between a subtle black
-                // background and the darker bottom section. The social asset
-                // itself remains untouched underneath this layer.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.40f to ComposeColor.Transparent,
-                                    0.55f to ComposeColor.Black.copy(alpha = 0.05f),
-                                    0.68f to ComposeColor.Black.copy(alpha = 0.18f),
-                                    0.82f to ComposeColor.Black.copy(alpha = 0.42f),
-                                    0.92f to ComposeColor.Black.copy(alpha = 0.72f),
-                                    1.00f to ComposeColor.Black
-                                )
-                            )
-                        )
-                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -391,7 +371,19 @@ class MainActivity : ComponentActivity() {
                 .fillMaxWidth()
                 .height(headlineHeight)
         ) {
-            // Unified canvas fade is already behind this headline.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                ComposeColor.Transparent,
+                                ComposeColor.Black.copy(alpha = 0.82f),
+                                ComposeColor.Black.copy(alpha = 0.98f)
+                            )
+                        )
+                    )
+            )
             Box(
                 Modifier
                     .fillMaxSize()
@@ -644,6 +636,21 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // Reference-style black fade rising behind the headline.
+        val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, height * 0.48f, 0f, height * 0.92f,
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.argb(190, 0, 0, 0),
+                    Color.argb(250, 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.68f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
+
         // Social icons use the complete user-provided asset across the
         // full 1080px output width and the exact bottom 20% = 270px.
         // No crop or trim; the bitmap is drawn into the complete social area.
@@ -661,27 +668,6 @@ class MainActivity : ComponentActivity() {
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
         }
-
-        // One continuous fade is drawn AFTER the social asset. This makes
-        // the subtle black beginning merge gradually into the black bottom
-        // instead of creating a visible hard boundary at the social strip.
-        // The user's social image is not cropped, trimmed, or recolored.
-        val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f, height * 0.40f, 0f, height.toFloat(),
-                intArrayOf(
-                    Color.argb(0, 0, 0, 0),
-                    Color.argb(18, 0, 0, 0),
-                    Color.argb(52, 0, 0, 0),
-                    Color.argb(105, 0, 0, 0),
-                    Color.argb(180, 0, 0, 0),
-                    Color.BLACK
-                ),
-                floatArrayOf(0f, 0.18f, 0.36f, 0.58f, 0.80f, 1f),
-                Shader.TileMode.CLAMP
-            )
-        }
-        canvas.drawRect(0f, height * 0.40f, width.toFloat(), height.toFloat(), fade)
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
