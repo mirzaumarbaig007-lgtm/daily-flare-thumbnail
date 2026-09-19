@@ -592,9 +592,17 @@ class MainActivity : ComponentActivity() {
                             val bitmapToSave = readyPreview ?: try {
                                 renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
                             } catch (_: OutOfMemoryError) {
-                                null
+                                try {
+                                    renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
+                                } catch (_: Throwable) {
+                                    null
+                                }
                             } catch (_: Exception) {
-                                null
+                                try {
+                                    renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
+                                } catch (_: Throwable) {
+                                    null
+                                }
                             }
 
                             if (bitmapToSave == null) {
