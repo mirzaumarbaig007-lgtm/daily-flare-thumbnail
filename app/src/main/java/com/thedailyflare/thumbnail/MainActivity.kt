@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
             val luminance = 0.299f * Color.red(p) + 0.587f * Color.green(p) + 0.114f * Color.blue(p)
             // Keep bright logo artwork. Fade only the dark matte so anti-aliased
             // edges remain smooth instead of becoming a hard cutout.
-            val matteAlpha = ((luminance - 35f) / 55f * alpha).coerceIn(0f, alpha)
+            val matteAlpha = ((luminance - 35f) / 55f * alpha.toFloat()).coerceIn(0f, alpha.toFloat())
             pixels[i] = Color.argb(
                 matteAlpha.toInt(),
                 Color.red(p),
