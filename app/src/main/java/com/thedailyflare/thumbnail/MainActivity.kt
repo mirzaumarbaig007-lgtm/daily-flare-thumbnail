@@ -1350,7 +1350,7 @@ class MainActivity : ComponentActivity() {
         // 1025px leaves about 2.5% margin on each side of the 1080px canvas.
         val textWidth = width * 0.949f
         val headlineTop = height * 0.700f
-        val headlineBottom = height * 0.880f
+        val headlineBottom = height * 0.925f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
