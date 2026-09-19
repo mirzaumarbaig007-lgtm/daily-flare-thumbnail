@@ -1320,11 +1320,11 @@ class MainActivity : ComponentActivity() {
                 0f, height * 0.58f, 0f, height.toFloat(),
                 intArrayOf(
                     Color.TRANSPARENT,
-                    Color.argb(80, 0, 0, 0),
-                    Color.argb(180, 0, 0, 0),
-                    Color.argb(248, 0, 0, 0)
+                    Color.argb(120, 0, 0, 0),
+                    Color.argb(220, 0, 0, 0),
+                    Color.argb(252, 0, 0, 0)
                 ),
-                floatArrayOf(0f, 0.42f, 0.72f, 1f),
+                floatArrayOf(0f, 0.30f, 0.58f, 1f),
                 Shader.TileMode.CLAMP
             )
         }
