@@ -79,6 +79,13 @@ import androidx.compose.ui.zIndex
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.io.ByteArrayInputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private object SimpleIconsLocal {
     val facebook get() = Facebook
@@ -89,6 +96,12 @@ private object SimpleIconsLocal {
     val tumblr get() = Tumblr
     val youtube get() = Youtube
 }
+
+private data class RssArticle(
+    val title: String,
+    val link: String,
+    val imageUrl: String?
+)
 
 private enum class LogoPosition {
     LEFT,
@@ -210,6 +223,112 @@ class MainActivity : ComponentActivity() {
 
     private fun loadLogoBitmap(uri: Uri?): Bitmap? = loadBitmap(uri)?.let(::cleanLogoBitmap)
 
+    private fun openHttpConnection(url: String): HttpURLConnection {
+        return (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 20000
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", "DailyFlareThumbnail/1.0")
+        }
+    }
+
+    private fun fetchRssArticles(): List<RssArticle> {
+        val connection = openHttpConnection("https://thedailyflare.com/feed/")
+        return try {
+            connection.connect()
+            if (connection.responseCode !in 200..299) return emptyList()
+            val parser = XmlPullParserFactory.newInstance().newPullParser()
+            parser.setInput(connection.inputStream, null)
+            val articles = mutableListOf<RssArticle>()
+            var event = parser.eventType
+            var insideItem = false
+            var title = ""
+            var link = ""
+            var imageUrl: String? = null
+            while (event != XmlPullParser.END_DOCUMENT) {
+                when (event) {
+                    XmlPullParser.START_TAG -> when (parser.name.lowercase(Locale.US)) {
+                        "item", "entry" -> {
+                            insideItem = true
+                            title = ""
+                            link = ""
+                            imageUrl = null
+                        }
+                        "title" -> if (insideItem) title = parser.nextText().trim()
+                        "link" -> if (insideItem) {
+                            val href = parser.getAttributeValue(null, "href")
+                            link = (href ?: parser.nextText()).trim()
+                        }
+                        "media:content", "content:content", "media:thumbnail" -> if (insideItem && imageUrl == null) {
+                            imageUrl = parser.getAttributeValue(null, "url")?.trim()?.takeIf { it.isNotEmpty() }
+                        }
+                        "enclosure" -> if (insideItem && imageUrl == null) {
+                            imageUrl = parser.getAttributeValue(null, "url")?.trim()?.takeIf { it.isNotEmpty() }
+                        }
+                    }
+                    XmlPullParser.END_TAG -> if (parser.name.equals("item", true) || parser.name.equals("entry", true)) {
+                        if (title.isNotBlank() && link.isNotBlank()) articles += RssArticle(title, link, imageUrl)
+                        insideItem = false
+                    }
+                }
+                event = parser.next()
+            }
+            articles
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun findFeaturedImageUrl(article: RssArticle): String? {
+        article.imageUrl?.let { return it }
+        if (article.link.isBlank()) return null
+        val connection = openHttpConnection(article.link)
+        return try {
+            connection.connect()
+            if (connection.responseCode !in 200..399) return null
+            val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val patterns = listOf(
+                Regex("<meta[^>]+property=[\\\"']og:image[\\\"'][^>]+content=[\\\"']([^\\\"']+)[\\\"']", RegexOption.IGNORE_CASE),
+                Regex("<meta[^>]+name=[\\\"']twitter:image[\\\"'][^>]+content=[\\\"']([^\\\"']+)[\\\"']", RegexOption.IGNORE_CASE),
+                Regex("<meta[^>]+content=[\\\"']([^\\\"']+)[\\\"'][^>]+property=[\\\"']og:image[\\\"']", RegexOption.IGNORE_CASE)
+            )
+            patterns.firstNotNullOfOrNull { it.find(html)?.groupValues?.getOrNull(1)?.trim() }
+        } catch (_: Exception) {
+            null
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun downloadBitmap(url: String?): Bitmap? {
+        if (url.isNullOrBlank()) return null
+        return try {
+            val first = openHttpConnection(url)
+            val bytes = first.inputStream.use { it.readBytes() }.also { first.disconnect() }
+            if (bytes.isEmpty()) return null
+
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            ByteArrayInputStream(bytes).use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            val maxDimension = 4096
+            var sampleSize = 1
+            while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
+                sampleSize *= 2
+            }
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            ByteArrayInputStream(bytes).use { BitmapFactory.decodeStream(it, null, options) }
+        } catch (_: OutOfMemoryError) {
+            System.gc()
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun persistUri(uri: Uri, key: String) {
         try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -226,6 +345,11 @@ class MainActivity : ComponentActivity() {
         var highlighted by rememberSaveable { mutableStateOf(emptySet<Int>()) }
         var logoPosition by rememberSaveable { mutableStateOf(LogoPosition.LEFT) }
         var showTextPopup by remember { mutableStateOf(false) }
+        var rssArticles by remember { mutableStateOf<List<RssArticle>>(emptyList()) }
+        var rssLoading by remember { mutableStateOf(true) }
+        var rssError by remember { mutableStateOf<String?>(null) }
+        var showRssDialog by remember { mutableStateOf(false) }
+        var selectedArticleTitle by rememberSaveable { mutableStateOf<String?>(null) }
 
         val mainPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) mainBitmap = loadBitmap(uri)
@@ -238,6 +362,37 @@ class MainActivity : ComponentActivity() {
             }
         }
         LaunchedEffect(logoUri) { logoBitmap = loadLogoBitmap(logoUri?.let(Uri::parse)) }
+
+        LaunchedEffect(Unit) {
+            rssLoading = true
+            rssError = null
+            try {
+                rssArticles = withContext(Dispatchers.IO) { fetchRssArticles() }
+                if (rssArticles.isEmpty()) rssError = "No Daily Flare articles found."
+            } catch (e: Exception) {
+                rssError = "Could not load Daily Flare RSS."
+            } finally {
+                rssLoading = false
+            }
+        }
+
+        fun chooseArticle(article: RssArticle) {
+            selectedArticleTitle = article.title
+            headline = article.title
+            showRssDialog = false
+            mainBitmap = null
+            headline = article.title
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                val bitmap = withContext(Dispatchers.IO) {
+                    downloadBitmap(findFeaturedImageUrl(article))
+                }
+                if (bitmap != null) {
+                    mainBitmap = bitmap
+                } else {
+                    Toast.makeText(this@MainActivity, "Could not load the article image. You can choose one from Gallery.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 16.dp),
@@ -258,11 +413,17 @@ class MainActivity : ComponentActivity() {
                 val previewHeadlineHeight = maxHeight * 0.20f
 
                 if (mainBitmap == null) {
-                    Button(
-                        onClick = { mainPicker.launch(arrayOf("image/*")) },
-                        modifier = Modifier.align(Alignment.Center)
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("＋", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                        Button(onClick = { showRssDialog = true }) {
+                            Text("Select Daily Flare Article", fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = { mainPicker.launch(arrayOf("image/*")) }) {
+                            Text("Choose Image from Gallery")
+                        }
                     }
                 } else {
                     val previewBitmap = remember(
@@ -387,8 +548,56 @@ class MainActivity : ComponentActivity() {
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tap logo • + for main image • headline area for text • social strip for icons",
+                "Tap image to replace it • headline area to edit text • logo to replace it",
                 fontSize = 12.sp
+            )
+        }
+
+        if (showRssDialog) {
+            AlertDialog(
+                onDismissRequest = { showRssDialog = false },
+                title = { Text("Daily Flare Articles", fontWeight = FontWeight.Bold) },
+                text = {
+                    when {
+                        rssLoading -> Text("Loading latest articles…")
+                        rssArticles.isEmpty() -> Text(rssError ?: "No articles available.")
+                        else -> Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            rssArticles.forEach { article ->
+                                TextButton(
+                                    onClick = { chooseArticle(article) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(article.title, modifier = Modifier.fillMaxWidth())
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Row {
+                        TextButton(onClick = {
+                            rssLoading = true
+                            rssError = null
+                            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                try {
+                                    rssArticles = withContext(Dispatchers.IO) { fetchRssArticles() }
+                                    if (rssArticles.isEmpty()) rssError = "No Daily Flare articles found."
+                                } catch (_: Exception) {
+                                    rssError = "Could not load Daily Flare RSS."
+                                } finally {
+                                    rssLoading = false
+                                }
+                            }
+                        }) { Text("Refresh") }
+                        TextButton(onClick = { mainPicker.launch(arrayOf("image/*")); showRssDialog = false }) { Text("Gallery") }
+                    }
+                },
+                dismissButton = { TextButton(onClick = { showRssDialog = false }) { Text("Cancel") } }
             )
         }
 
