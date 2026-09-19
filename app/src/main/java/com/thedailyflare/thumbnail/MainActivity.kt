@@ -245,7 +245,7 @@ class MainActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth(0.80f)
+                            .fillMaxWidth()
                             .height(previewSocialHeight)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         color = ComposeColor.White.copy(alpha = 0.88f),
@@ -565,16 +565,17 @@ class MainActivity : ComponentActivity() {
 
         // Large top-left logo with a soft dark shadow.
         logo?.let {
-            val maxLogo = 150f
+            val maxLogo = 210f
             val s = minOf(maxLogo / it.width, maxLogo / it.height)
             val lw = it.width * s
             val lh = it.height * s
             val x = 48f
             val y = 48f
-            // Create the shadow on an output-sized alpha mask at the EXACT logo
-            // coordinates. Do not use extractAlpha() offsets: those can shift the
-            // shadow away from the logo. The mask is blurred only around the logo
-            // silhouette, so there is no rectangular/center-screen shadow.
+            // Build a real black shadow from the logo alpha silhouette.
+            // The previous implementation blurred an ALPHA_8 bitmap and tried to
+            // tint it with Paint.color; bitmap pixels are not tinted that way, so
+            // the shadow could disappear. Here we explicitly compose BLACK through
+            // the blurred alpha mask at the exact logo coordinates.
             val shadowMask = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
             val shadowCanvas = Canvas(shadowMask)
             val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -584,17 +585,32 @@ class MainActivity : ComponentActivity() {
                 maskPaint
             )
 
-            val blurPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.BLACK
-                alpha = 150
-                maskFilter = android.graphics.BlurMaskFilter(
-                    16f,
-                    android.graphics.BlurMaskFilter.Blur.NORMAL
-                )
-            }
-            val blurredShadow = shadowMask.extractAlpha(blurPaint, null)
-            canvas.drawBitmap(blurredShadow, 0f, 0f, blurPaint)
-            blurredShadow.recycle()
+            val blurPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            val blurredAlpha = shadowMask.extractAlpha(
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    maskFilter = android.graphics.BlurMaskFilter(
+                        14f,
+                        android.graphics.BlurMaskFilter.Blur.NORMAL
+                    )
+                },
+                null
+            )
+
+            val shadowBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val shadowCanvas2 = Canvas(shadowBitmap)
+            shadowCanvas2.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            shadowCanvas2.drawColor(Color.BLACK)
+            blurPaint.alpha = 165
+            blurPaint.xfermode = android.graphics.PorterDuffXfermode(
+                android.graphics.PorterDuff.Mode.DST_IN
+            )
+            shadowCanvas2.drawBitmap(blurredAlpha, 0f, 0f, blurPaint)
+            blurPaint.xfermode = null
+
+            // Slight downward offset, still locked to the logo — never screen center.
+            canvas.drawBitmap(shadowBitmap, 0f, 4f, Paint(Paint.ANTI_ALIAS_FLAG))
+            shadowBitmap.recycle()
+            blurredAlpha.recycle()
             shadowMask.recycle()
 
             val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -721,17 +737,14 @@ class MainActivity : ComponentActivity() {
         // proportionally inside the bottom 5%, with 10% padding on each side.
         socials?.let {
             val socialAreaHeight = height * 0.05f
-            val sidePadding = width * 0.10f
-            val targetWidth = width - (sidePadding * 2f)
-            val targetHeight = socialAreaHeight
-            val scale = minOf(
-                targetWidth / it.width.toFloat(),
-                targetHeight / it.height.toFloat()
-            )
+            // The 5% is the social-image height, not a width cap. Use the
+            // COMPLETE supplied asset at 100% of its content, preserving its
+            // aspect ratio. Do not crop, trim, or impose an 80% width limit.
+            val scale = socialAreaHeight / it.height.toFloat()
             val sw = it.width * scale
             val sh = it.height * scale
             val x = (width - sw) / 2f
-            val y = height - socialAreaHeight + (socialAreaHeight - sh) / 2f
+            val y = height - socialAreaHeight
             canvas.drawBitmap(
                 it, null,
                 android.graphics.RectF(x, y, x + sw, y + sh),
