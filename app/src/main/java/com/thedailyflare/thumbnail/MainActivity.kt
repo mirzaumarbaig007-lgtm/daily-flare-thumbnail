@@ -107,6 +107,54 @@ class MainActivity : ComponentActivity() {
         uri?.let { contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) }
     } catch (_: Exception) { null }
 
+    // The Daily Flare logo is normally white artwork on a dark square/matte.
+    // Remove that dark matte when present so the visible logo and its shadow
+    // follow the actual letter silhouette rather than a rectangular image box.
+    private fun cleanLogoBitmap(source: Bitmap): Bitmap {
+        val w = source.width
+        val h = source.height
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+
+        val samplePoints = arrayOf(
+            0 to 0, (w - 1) to 0, 0 to (h - 1), (w - 1) to (h - 1),
+            w / 2 to 0, w / 2 to (h - 1), 0 to h / 2, (w - 1) to h / 2
+        )
+        var darkOpaqueCorners = 0
+        for ((x, y) in samplePoints) {
+            val p = source.getPixel(x, y)
+            val a = Color.alpha(p)
+            val luminance = (0.299f * Color.red(p) + 0.587f * Color.green(p) + 0.114f * Color.blue(p))
+            if (a > 220 && luminance < 55f) darkOpaqueCorners++
+        }
+
+        // Only strip a dark matte when the image actually has one.
+        val hasDarkMatte = darkOpaqueCorners >= 4
+        if (!hasDarkMatte) return source
+
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+        for (i in pixels.indices) {
+            val p = pixels[i]
+            val alpha = Color.alpha(p)
+            if (alpha == 0) continue
+
+            val luminance = 0.299f * Color.red(p) + 0.587f * Color.green(p) + 0.114f * Color.blue(p)
+            // Keep bright logo artwork. Fade only the dark matte so anti-aliased
+            // edges remain smooth instead of becoming a hard cutout.
+            val matteAlpha = ((luminance - 35f) / 55f * alpha).coerceIn(0f, alpha)
+            pixels[i] = Color.argb(
+                matteAlpha.toInt(),
+                Color.red(p),
+                Color.green(p),
+                Color.blue(p)
+            )
+        }
+        result.setPixels(pixels, 0, w, 0, 0, w, h)
+        return result
+    }
+
+    private fun loadLogoBitmap(uri: Uri?): Bitmap? = loadBitmap(uri)?.let(::cleanLogoBitmap)
+
     private fun persistUri(uri: Uri, key: String) {
         try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -130,10 +178,10 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
                 persistUri(uri, "logo_uri")
                 logoUri = uri.toString()
-                logoBitmap = loadBitmap(uri)
+                logoBitmap = loadLogoBitmap(uri)
             }
         }
-        LaunchedEffect(logoUri) { logoBitmap = loadBitmap(logoUri?.let(Uri::parse)) }
+        LaunchedEffect(logoUri) { logoBitmap = loadLogoBitmap(logoUri?.let(Uri::parse)) }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -597,7 +645,7 @@ class MainActivity : ComponentActivity() {
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
 
-        // Large top-left logo with a soft dark shadow.
+        // Large top-left logo with a silhouette-only soft shadow.
         logo?.let {
             val maxLogo = 210f
             val s = minOf(maxLogo / it.width, maxLogo / it.height)
@@ -605,30 +653,29 @@ class MainActivity : ComponentActivity() {
             val lh = it.height * s
             val x = 48f
             val y = 48f
-            // Create ONLY a local transparent shadow around the logo.
-            // Never create/fill a full 1080x1350 black bitmap.
-            val blurRadius = 16f
-            val shadowPadding = 32f
+
+            // Build a small local alpha mask from the cleaned logo itself.
+            // This guarantees the shadow can never become a rectangular box.
+            val blurRadius = 13f
+            val shadowPadding = 26f
             val localW = (lw + shadowPadding * 2f).toInt().coerceAtLeast(1)
             val localH = (lh + shadowPadding * 2f).toInt().coerceAtLeast(1)
 
-            // The logo is a transparent PNG. Use its alpha channel directly;
-            // never inspect its colors and never create a rectangular shadow.
-            val logoMask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
-            val maskCanvas = Canvas(logoMask)
-            val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            val mask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
+            val maskCanvas = Canvas(mask)
             maskCanvas.drawBitmap(
-                it, null,
+                it,
+                null,
                 android.graphics.RectF(
                     shadowPadding,
                     shadowPadding,
                     shadowPadding + lw,
                     shadowPadding + lh
                 ),
-                maskPaint
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
 
-            val blurred = logoMask.extractAlpha(
+            val blurred = mask.extractAlpha(
                 Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     maskFilter = android.graphics.BlurMaskFilter(
                         blurRadius,
@@ -638,36 +685,35 @@ class MainActivity : ComponentActivity() {
                 null
             )
 
-            // Black pixels are masked only by the blurred TDF silhouette.
             val shadow = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
             val shadowCanvas = Canvas(shadow)
-            shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
-            val blackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             shadowCanvas.drawColor(Color.BLACK)
-            blackPaint.xfermode = android.graphics.PorterDuffXfermode(
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            shadowPaint.xfermode = android.graphics.PorterDuffXfermode(
                 android.graphics.PorterDuff.Mode.DST_IN
             )
-            shadowCanvas.drawBitmap(blurred, 0f, 0f, blackPaint)
-            blackPaint.xfermode = null
-            blackPaint.alpha = 145
+            shadowCanvas.drawBitmap(blurred, 0f, 0f, shadowPaint)
+            shadowPaint.xfermode = null
+            shadowPaint.alpha = 125
 
             canvas.drawBitmap(
                 shadow,
                 x - shadowPadding,
-                y - shadowPadding + 5f,
-                blackPaint
+                y - shadowPadding + 4f,
+                shadowPaint
+            )
+
+            // Draw the cleaned logo itself on top of its silhouette shadow.
+            canvas.drawBitmap(
+                it,
+                null,
+                android.graphics.RectF(x, y, x + lw, y + lh),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
 
             shadow.recycle()
             blurred.recycle()
-            logoMask.recycle()
-
-            val logoPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            canvas.drawBitmap(
-                it, null,
-                android.graphics.RectF(x, y, x + lw, y + lh),
-                logoPaint
-            )
+            mask.recycle()
         }
 
         // Reference-style black fade rising behind the headline.
