@@ -1420,11 +1420,13 @@ class MainActivity : ComponentActivity() {
                     }
                     val horizontalPadding = 3f
                     val verticalPadding = 7f
-                    canvas.drawRect(
+                    canvas.drawRoundRect(
                         x - horizontalPadding,
                         baseline + textPaint.ascent() + verticalPadding,
                         x + wordWidth + horizontalPadding,
                         baseline + textPaint.descent() - verticalPadding,
+                        5f,
+                        5f,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
