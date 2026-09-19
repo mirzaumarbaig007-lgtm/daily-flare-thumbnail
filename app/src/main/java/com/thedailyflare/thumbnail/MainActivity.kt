@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
                 val previewHeadlineHeight = maxHeight * 0.20f
-                val previewSocialHeight = maxHeight * 0.20f
+                val previewSocialHeight = maxHeight * 0.05f
                 // Main image: a centered + button until an image is selected.
                 if (mainBitmap == null) {
                     Button(
@@ -262,8 +262,7 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
-                            .offset(y = -(previewSocialHeight * 0.625f))
+                            .padding(horizontal = 18.dp, vertical = 0.dp)
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
                         shape = RoundedCornerShape(8.dp)
@@ -286,7 +285,6 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
-                            .offset(y = -(previewSocialHeight * 0.6666667f))
                             .clickable { showTextPopup = true }
                     )
                 }
@@ -503,62 +501,66 @@ class MainActivity : ComponentActivity() {
         val clean = text.trim()
         if (clean.isEmpty()) return ""
 
-        val fractions = floatArrayOf(1f, 0.50f, 1f / 3f, 0.24f)
-
-        for (targetLines in 1..4) {
-            val targetSize = headlineAreaHeight * fractions[targetLines - 1]
-            val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create("sans-serif", Typeface.BOLD)
-                textSize = targetSize
-            }
-            val layout = StaticLayout.Builder.obtain(
-                clean, 0, clean.length, paint, maxWidth.toInt()
-            )
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setIncludePad(false)
-                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
-                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-                .setLineSpacing(0f, 1.05f)
-                .build()
-
-            if (layout.lineCount <= targetLines) {
-                return (0 until layout.lineCount).joinToString("\n") { line ->
-                    clean.substring(
-                        layout.getLineStart(line),
-                        layout.getLineEnd(line)
-                    ).trim()
-                }
-            }
-        }
-
-        // Very long headlines: preserve the 4-line design and word-boundary
-        // wrapping rather than allowing the renderer to create a fifth line.
-        val targetSize = headlineAreaHeight * 0.24f
-        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        /*
+         * First establish a stable word-boundary wrap at a moderate reference
+         * size. Never allow the result to exceed four lines. The final font
+         * size is then derived from that fixed line count.
+         */
+        val referencePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            textSize = targetSize
+            textSize = 64f
         }
-        val layout = StaticLayout.Builder.obtain(
-            clean, 0, clean.length, paint, maxWidth.toInt()
+        val referenceLayout = StaticLayout.Builder.obtain(
+            clean, 0, clean.length, referencePaint, maxWidth.toInt()
         )
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
             .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
             .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-            .setLineSpacing(0f, 1.05f)
+            .setLineSpacing(0f, 1f)
             .build()
 
-        if (layout.lineCount <= 4) {
-            return (0 until layout.lineCount).joinToString("\n") { line ->
-                clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
-            }
+        val naturalLines = (0 until referenceLayout.lineCount).map { line ->
+            clean.substring(
+                referenceLayout.getLineStart(line),
+                referenceLayout.getLineEnd(line)
+            ).trim()
         }
 
-        val firstThree = (0 until 3).map { line ->
-            clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
+        if (naturalLines.size <= 4) {
+            return naturalLines.joinToString("\n")
         }
-        val fourthStart = layout.getLineStart(3)
-        return (firstThree + clean.substring(fourthStart).trim()).joinToString("\n")
+
+        // Four balanced word-boundary lines. We do not split words.
+        val words = clean.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val lines = mutableListOf<String>()
+        var cursor = 0
+
+        for (lineIndex in 0 until 4) {
+            val remainingLines = 4 - lineIndex
+            val remainingWords = words.size - cursor
+            if (remainingLines == 1) {
+                lines += words.drop(cursor).joinToString(" ")
+                break
+            }
+
+            val targetWords = kotlin.math.ceil(
+                remainingWords.toDouble() / remainingLines.toDouble()
+            ).toInt()
+
+            var endWord = (cursor + targetWords).coerceAtMost(words.size)
+            val candidate = words.subList(cursor, endWord).joinToString(" ")
+
+            // Prefer the longest candidate that still fits the reference width.
+            while (endWord > cursor + 1 && referencePaint.measureText(candidate) > maxWidth) {
+                endWord--
+            }
+
+            lines += words.subList(cursor, endWord).joinToString(" ")
+            cursor = endWord
+        }
+
+        return lines.joinToString("\n")
     }
 
     private fun dynamicHeadlineMetrics(
@@ -576,11 +578,14 @@ class MainActivity : ComponentActivity() {
             3 -> 1f / 3f
             else -> 0.24f
         }
+        // The headline must physically remain inside its 20% zone.
+        // For four lines, 24% is the requested nominal scale; 1.02 line
+        // spacing prevents the block from spilling into the social row.
         val textSize = headlineAreaHeight * fraction
 
         return HeadlineMetrics(
             textSize = textSize,
-            lineHeight = textSize * 1.05f,
+            lineHeight = textSize * 1.02f,
             lineCount = lineCount
         )
     }
@@ -785,17 +790,16 @@ class MainActivity : ComponentActivity() {
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
-            .setLineSpacing(0f, 1.05f)
+            .setLineSpacing(0f, 1.02f)
             .build()
 
         // Keep the headline as one compact block immediately above the social icons.
         // Do not distribute the text across the whole 20% zone; the 20% zone
         // controls the font size, while this anchor controls the final position.
-        val iconHeight = 34f
-        val gap = 14f
-        val targetLastBaseline = height - iconHeight - gap - textPaint.fontMetrics.descent
-        val layoutLastBaseline = layout.getLineBaseline(layout.lineCount - 1).toFloat()
-        val textTop = targetLastBaseline - layoutLastBaseline
+        val headlineZoneBottom = height - socialAreaHeight
+        val headlineZoneTop = headlineZoneBottom - headlineAreaHeight
+        val layoutHeight = layout.height.toFloat()
+        val textTop = headlineZoneTop + maxOf(0f, (headlineAreaHeight - layoutHeight) / 2f)
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
