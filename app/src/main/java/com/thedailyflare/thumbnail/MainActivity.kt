@@ -785,12 +785,13 @@ class MainActivity : ComponentActivity() {
             val x = 48f
             val y = 48f
 
-            // Make a local alpha silhouette from the cleaned logo. The blur is
-            // performed on this small local mask, so no canvas-sized rectangle
-            // can ever participate in the shadow.
-            val padding = 30f
+            // Build the shadow ONLY from the logo's alpha silhouette.
+            // Never blur a rectangular/logo-container bitmap: that creates the
+            // unwanted square shadow seen in earlier versions.
+            val padding = 38f
             val localW = (lw + padding * 2f).toInt().coerceAtLeast(1)
             val localH = (lh + padding * 2f).toInt().coerceAtLeast(1)
+
             val mask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
             Canvas(mask).drawBitmap(
                 it,
@@ -807,15 +808,26 @@ class MainActivity : ComponentActivity() {
             val shadowCanvas = Canvas(shadow)
             shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
+            // A stronger but still soft silhouette shadow. Because the source
+            // is ALPHA_8, only the actual white logo artwork is blurred.
             val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
-                alpha = 150
+                alpha = 185
                 maskFilter = android.graphics.BlurMaskFilter(
-                    14f,
+                    11f,
                     android.graphics.BlurMaskFilter.Blur.NORMAL
                 )
             }
-            shadowCanvas.drawBitmap(mask, 0f, 3f, shadowPaint)
+            shadowCanvas.drawBitmap(mask, 0f, 5f, shadowPaint)
+
+            // Add a small crisp offset silhouette underneath the blur. This
+            // makes the shadow visible even on bright backgrounds while still
+            // following the logo contours exactly.
+            val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                alpha = 80
+            }
+            shadowCanvas.drawBitmap(mask, 2f, 5f, edgePaint)
 
             canvas.drawBitmap(
                 shadow,
