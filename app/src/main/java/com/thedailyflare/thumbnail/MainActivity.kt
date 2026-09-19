@@ -519,20 +519,12 @@ class MainActivity : ComponentActivity() {
 
         repeat(12) {
             val slotHeight = headlineAreaHeight / lineCount
-            paint.textSize = slotHeight
-            val fm = paint.fontMetrics
-            val glyphHeight = (fm.descent - fm.ascent).coerceAtLeast(1f)
-
-            // Leave a little breathing room inside each allocated line slot.
-            size = slotHeight * 0.82f / glyphHeight * size
-
-            // Because glyphHeight scales with text size, normalize the
-            // calculation from the actual font metrics at the candidate size.
-            paint.textSize = size
-            val candidateFm = paint.fontMetrics
-            val candidateGlyphHeight =
-                (candidateFm.descent - candidateFm.ascent).coerceAtLeast(1f)
-            size *= (slotHeight * 0.82f) / candidateGlyphHeight
+            // Font metrics scale linearly with textSize, so measure a known
+            // reference size and derive the exact size for this line slot.
+            paint.textSize = 100f
+            val referenceGlyphHeight =
+                (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
+            size = 100f * (slotHeight * 0.82f) / referenceGlyphHeight
 
             val actualLines = layoutFor(size).lineCount.coerceIn(1, 4)
             if (actualLines == lineCount) return@repeat
@@ -541,10 +533,10 @@ class MainActivity : ComponentActivity() {
 
         // Final sizing pass for the stabilized line count.
         val finalSlot = headlineAreaHeight / lineCount
-        paint.textSize = finalSlot
-        val fm = paint.fontMetrics
-        val glyphHeight = (fm.descent - fm.ascent).coerceAtLeast(1f)
-        val finalSize = finalSlot * 0.82f / glyphHeight * finalSlot
+        paint.textSize = 100f
+        val finalGlyphHeight =
+            (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
+        val finalSize = 100f * (finalSlot * 0.82f) / finalGlyphHeight
 
         return HeadlineMetrics(
             textSize = finalSize,
