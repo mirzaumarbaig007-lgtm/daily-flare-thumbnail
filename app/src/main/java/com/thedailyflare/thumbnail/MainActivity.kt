@@ -755,7 +755,7 @@ class MainActivity : ComponentActivity() {
                                 val isSelected = index in selected
                                 Surface(
                                     modifier = Modifier
-                                        .width(IntrinsicSize.Min)
+                                        .wrapContentWidth()
                                         .height(28.dp)
                                         .clickable {
                                             selected = if (isSelected) selected - index else selected + index
