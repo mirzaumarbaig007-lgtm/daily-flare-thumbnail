@@ -502,9 +502,46 @@ class MainActivity : ComponentActivity() {
                         "Final thumbnail preview",
                         Modifier
                             .fillMaxSize()
-                            .zIndex(-1f)
+                            .zIndex(0f)
                             .clickable { mainPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.FillBounds
+                    )
+
+                    // Keep editable overlays above the background image.
+                    if (logoBitmap != null) {
+                        Image(
+                            logoBitmap!!.asImageBitmap(),
+                            "Logo",
+                            Modifier
+                                .then(
+                                    when (logoPosition) {
+                                        LogoPosition.LEFT -> Modifier
+                                            .align(Alignment.TopStart)
+                                            .padding(start = 18.dp, top = 18.dp)
+                                        LogoPosition.RIGHT -> Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(end = 18.dp, top = 18.dp)
+                                        LogoPosition.CENTER_BOTTOM -> Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .offset(y = -(previewHeadlineHeight + 10.dp))
+                                    }
+                                )
+                                .size(92.dp)
+                                .zIndex(4f)
+                                .clickable { logoPicker.launch(arrayOf("image/*")) },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+                    HeadlinePreview(
+                        headline = headline,
+                        highlighted = highlighted,
+                        headlineHeight = previewHeadlineHeight,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(y = -(maxHeight * 0.05f))
+                            .zIndex(2f)
+                            .clickable { showTextPopup = true }
                     )
 
                     when (logoPosition) {
@@ -586,18 +623,12 @@ class MainActivity : ComponentActivity() {
                     onClick = {
                         val source = mainBitmap ?: return@Button
                         val title = headline.trim().ifBlank { "Daily Flare" }
-                        val readyPreview = previewBitmap
-
                         exportScope.launch(Dispatchers.Default) {
-                            val bitmapToSave = readyPreview ?: try {
+                            // Export from a fresh background render. Never depend on the
+                            // Compose preview bitmap, which can be stale or unavailable.
+                            val bitmapToSave = try {
                                 renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
-                            } catch (_: OutOfMemoryError) {
-                                try {
-                                    renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
-                                } catch (_: Throwable) {
-                                    null
-                                }
-                            } catch (_: Exception) {
+                            } catch (_: Throwable) {
                                 try {
                                     renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
                                 } catch (_: Throwable) {
