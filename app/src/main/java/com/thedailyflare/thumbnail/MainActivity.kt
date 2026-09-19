@@ -119,9 +119,47 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun loadBitmap(uri: Uri?): Bitmap? = try {
-        uri?.let { contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) }
-    } catch (_: Exception) { null }
+    // Decode user-selected images safely. Phone photos can be 10K+ pixels and
+    // decoding the full source bitmap can exhaust the app heap immediately after
+    // the picker closes. We only need enough detail for the 1080x1350 output.
+    private fun loadBitmap(uri: Uri?): Bitmap? {
+        if (uri == null) return null
+
+        return try {
+            val bounds = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+
+            contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, bounds)
+            }
+
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+            val maxDimension = 4096
+            var sampleSize = 1
+            while (
+                bounds.outWidth / sampleSize > maxDimension ||
+                bounds.outHeight / sampleSize > maxDimension
+            ) {
+                sampleSize *= 2
+            }
+
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+
+            contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, options)
+            }
+        } catch (_: OutOfMemoryError) {
+            System.gc()
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     // The logo asset can contain a dark square/matte around white artwork.
     // Convert that matte to transparency before both preview and export so the
