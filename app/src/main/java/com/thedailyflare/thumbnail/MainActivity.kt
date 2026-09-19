@@ -414,41 +414,13 @@ class MainActivity : ComponentActivity() {
             logoBitmap = bitmap
         }
 
-        // Render the expensive 1080x1350 preview away from the UI thread.
-        // Large gallery/RSS images previously triggered renderThumbnail() during
-        // Compose recomposition, which could crash the app before the preview appeared.
-        LaunchedEffect(mainBitmap, logoBitmap, headline, highlighted, logoPosition) {
-            val source = mainBitmap
-            if (source == null) {
-                previewBitmap = null
-                previewError = null
-            } else {
-                previewBitmap = null
-                previewError = null
-                val rendered = withContext(Dispatchers.Default) {
-                    val title = headline.trim().ifBlank { "Daily Flare" }
-                    try {
-                        renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
-                    } catch (_: OutOfMemoryError) {
-                        try {
-                            renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                    } catch (_: Exception) {
-                        try {
-                            renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                    }
-                }
-                previewBitmap = rendered
-                if (rendered == null) {
-                    previewError = "Preview could not be rendered. Try a smaller image."
-                }
-            }
-        }
+        // IMPORTANT: Do not render a second 1080x1350 bitmap when an image is
+        // selected. The previous live-preview renderer was the remaining source
+        // of selection-time crashes. The editor preview is now composed directly
+        // from the source bitmap plus lightweight Compose overlays. Export still
+        // performs its own background render.
+        previewBitmap = null
+        previewError = null
 
         LaunchedEffect(Unit) {
             rssLoading = true
@@ -515,7 +487,7 @@ class MainActivity : ComponentActivity() {
                     }
                 } else {
                     Image(
-                        (previewBitmap ?: mainBitmap)!!.asImageBitmap(),
+                        mainBitmap!!.asImageBitmap(),
                         "Final thumbnail preview",
                         Modifier
                             .fillMaxSize()
