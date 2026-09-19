@@ -502,69 +502,127 @@ class MainActivity : ComponentActivity() {
         maxWidth: Float,
         headlineAreaHeight: Float
     ): String {
-        val clean = text.trim()
+        val clean = text.trim().replace(Regex("\\s+"), " ")
         if (clean.isEmpty()) return ""
 
+        val words = clean.split(" ").filter { it.isNotEmpty() }
+
         /*
-         * First establish a stable word-boundary wrap at a moderate reference
-         * size. Never allow the result to exceed four lines. The final font
-         * size is then derived from that fixed line count.
+         * Choose the line breaks using the REAL target font size for each
+         * possible line count. The old reference-size wrap could decide that
+         * "$24.3" did not fit on line 1 and push it onto a separate line.
+         *
+         * We now test 1..4 lines and, for each count, find the word-boundary
+         * arrangement with the most balanced line widths. This lets:
+         *
+         *   U.S. Approves Potential $24.3
+         *   Billion F-35 Sale to Saudi
+         *   Arabia
+         *
+         * stay together instead of isolating "$24.3".
          */
-        val referencePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            textSize = 64f
-        }
-        val referenceLayout = StaticLayout.Builder.obtain(
-            clean, 0, clean.length, referencePaint, maxWidth.toInt()
-        )
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setIncludePad(false)
-            .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
-            .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-            .setLineSpacing(0f, 1f)
-            .build()
-
-        val naturalLines = (0 until referenceLayout.lineCount).map { line ->
-            clean.substring(
-                referenceLayout.getLineStart(line),
-                referenceLayout.getLineEnd(line)
-            ).trim()
+        fun targetTextSize(lineCount: Int): Float {
+            val fraction = when (lineCount) {
+                1 -> 1f
+                2 -> 0.50f
+                3 -> 1f / 3f
+                else -> 0.24f
+            }
+            return headlineAreaHeight * fraction
         }
 
-        if (naturalLines.size <= 4) {
-            return naturalLines.joinToString("\n")
-        }
-
-        // Four balanced word-boundary lines. We do not split words.
-        val words = clean.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val lines = mutableListOf<String>()
-        var cursor = 0
-
-        for (lineIndex in 0 until 4) {
-            val remainingLines = 4 - lineIndex
-            val remainingWords = words.size - cursor
-            if (remainingLines == 1) {
-                lines += words.drop(cursor).joinToString(" ")
-                break
+        fun paintFor(size: Float): TextPaint =
+            TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                textSize = size
             }
 
-            val targetWords = kotlin.math.ceil(
-                remainingWords.toDouble() / remainingLines.toDouble()
-            ).toInt()
+        fun bestWrapFor(lineCount: Int): String? {
+            if (words.size < lineCount) return null
 
-            var endWord = (cursor + targetWords).coerceAtMost(words.size)
-            val candidate = words.subList(cursor, endWord).joinToString(" ")
-
-            // Prefer the longest candidate that still fits the reference width.
-            while (endWord > cursor + 1 && referencePaint.measureText(candidate) > maxWidth) {
-                endWord--
+            val paint = paintFor(targetTextSize(lineCount))
+            val n = words.size
+            val widths = FloatArray(n)
+            for (i in 0 until n) {
+                widths[i] = paint.measureText(words[i])
             }
 
-            lines += words.subList(cursor, endWord).joinToString(" ")
-            cursor = endWord
+            // prefix width includes one normal space between adjacent words.
+            val prefix = FloatArray(n + 1)
+            for (i in 0 until n) {
+                prefix[i + 1] = prefix[i] + widths[i] + if (i == 0) 0f else paint.measureText(" ")
+            }
+
+            fun lineWidth(from: Int, to: Int): Float =
+                prefix[to] - prefix[from] -
+                    if (from > 0) paint.measureText(" ") else 0f
+
+            // Dynamic programming: minimize squared raggedness while keeping
+            // every line within the actual text width.
+            val inf = Double.POSITIVE_INFINITY
+            val cost = Array(lineCount + 1) { DoubleArray(n + 1) { inf } }
+            val previous = Array(lineCount + 1) { IntArray(n + 1) { -1 } }
+            cost[0][0] = 0.0
+
+            for (line in 1..lineCount) {
+                for (endWord in line..n) {
+                    for (startWord in (line - 1) until endWord) {
+                        if (!cost[line - 1][startWord].isFinite()) continue
+                        val width = lineWidth(startWord, endWord)
+                        if (width > maxWidth) continue
+
+                        val slack = (maxWidth - width).toDouble()
+                        // Squared slack discourages one very short line while
+                        // still allowing natural word-boundary wrapping.
+                        val candidate = cost[line - 1][startWord] + slack * slack
+                        if (candidate < cost[line][endWord]) {
+                            cost[line][endWord] = candidate
+                            previous[line][endWord] = startWord
+                        }
+                    }
+                }
+            }
+
+            if (!cost[lineCount][n].isFinite()) return null
+
+            val ranges = ArrayList<IntRange>(lineCount)
+            var endWord = n
+            for (line in lineCount downTo 1) {
+                val startWord = previous[line][endWord]
+                if (startWord < 0) return null
+                ranges += startWord until endWord
+                endWord = startWord
+            }
+            ranges.reverse()
+
+            return ranges.joinToString("\n") { range ->
+                words.subList(range.first, range.last + 1).joinToString(" ")
+            }
         }
 
-        return lines.joinToString("\n")
+        // Prefer the fewest lines that can fit at the intended design size.
+        // This is what keeps medium headlines from being unnecessarily pushed
+        // into four lines just because of a smaller reference-font wrap.
+        for (lineCount in 1..4) {
+            bestWrapFor(lineCount)?.let { return it }
+        }
+
+        // Last-resort four-line word-boundary wrap. This is only reached for
+        // unusually long headlines that cannot fit even at the four-line target.
+        val fallbackPaint = paintFor(targetTextSize(4))
+        val fallback = mutableListOf<String>()
+        var current = ""
+        for (word in words) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && fallbackPaint.measureText(candidate) > maxWidth) {
+                fallback += current
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+        if (current.isNotEmpty()) fallback += current
+        return fallback.take(4).joinToString("\n")
     }
 
     private fun dynamicHeadlineMetrics(
