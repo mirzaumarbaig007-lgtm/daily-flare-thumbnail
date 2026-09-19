@@ -825,18 +825,51 @@ class MainActivity : ComponentActivity() {
                     ) {
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
                             maxItemsInEachRow = Int.MAX_VALUE
                         ) {
                             words.forEachIndexed { index, word ->
-                                FilterChip(
-                                    selected = index in selected,
-                                    onClick = {
-                                        selected = if (index in selected) selected - index else selected + index
+                                val isSelected = index in selected
+                                Surface(
+                                    modifier = Modifier
+                                        .height(32.dp)
+                                        .clickable {
+                                            selected = if (isSelected) {
+                                                selected - index
+                                            } else {
+                                                selected + index
+                                            }
+                                        },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        ComposeColor.Transparent
                                     },
-                                    label = { Text(word, fontWeight = FontWeight.Bold) }
-                                )
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            ComposeColor(0xFF85808A)
+                                        }
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 10.dp)
+                                            .fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            word,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
