@@ -405,7 +405,7 @@ class MainActivity : ComponentActivity() {
         }
         val previewWidthPx = screenWidthPx - sidePx * 2f
 
-        val wrappedHeadline = wrapHeadlineText(headline, previewWidthPx)
+        val wrappedHeadline = wrapHeadlineText(headline, previewWidthPx, headlineHeightPx)
         val matches = Regex("\\S+").findAll(wrappedHeadline).toList()
 
         val annotated = buildAnnotatedString {
@@ -480,16 +480,63 @@ class MainActivity : ComponentActivity() {
         val lineCount: Int
     )
 
-    // Establish the natural line count at one stable reference size first.
-    // Then scale the font FROM that line count. This prevents the previous
-    // feedback loop where changing the font changed the line count again.
-    private fun wrapHeadlineText(text: String, maxWidth: Float): String {
+    /*
+     * Choose the line count from the ACTUAL final font size, not from a
+     * tiny reference font. This was the reason the old version produced
+     * nearly the same-sized headline regardless of line count.
+     *
+     * The 20% headline zone is 270 px at export size:
+     *   1 line = 100% of the zone
+     *   2 lines = 50%
+     *   3 lines = 33.33%
+     *   4 lines = 24%
+     *
+     * We test those real sizes from one line upward and keep the first size
+     * that can contain the complete headline. StaticLayout still breaks only
+     * at word boundaries and hyphenation remains disabled.
+     */
+    private fun wrapHeadlineText(
+        text: String,
+        maxWidth: Float,
+        headlineAreaHeight: Float
+    ): String {
         val clean = text.trim()
         if (clean.isEmpty()) return ""
 
+        val fractions = floatArrayOf(1f, 0.50f, 1f / 3f, 0.24f)
+
+        for (targetLines in 1..4) {
+            val targetSize = headlineAreaHeight * fractions[targetLines - 1]
+            val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                textSize = targetSize
+            }
+            val layout = StaticLayout.Builder.obtain(
+                clean, 0, clean.length, paint, maxWidth.toInt()
+            )
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false)
+                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
+                .setLineSpacing(0f, 1.05f)
+                .build()
+
+            if (layout.lineCount <= targetLines) {
+                return (0 until layout.lineCount).joinToString("\n") { line ->
+                    clean.substring(
+                        layout.getLineStart(line),
+                        layout.getLineEnd(line)
+                    ).trim()
+                }
+            }
+        }
+
+        // Very long headlines: preserve the 4-line design and word-boundary
+        // wrapping rather than allowing the renderer to create a fifth line.
+        val targetSize = headlineAreaHeight * 0.24f
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            textSize = 64f
+            textSize = targetSize
         }
         val layout = StaticLayout.Builder.obtain(
             clean, 0, clean.length, paint, maxWidth.toInt()
@@ -498,12 +545,11 @@ class MainActivity : ComponentActivity() {
             .setIncludePad(false)
             .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
             .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-            .setLineSpacing(0f, 1f)
+            .setLineSpacing(0f, 1.05f)
             .build()
 
-        val count = layout.lineCount
-        if (count <= 4) {
-            return (0 until count).joinToString("\n") { line ->
+        if (layout.lineCount <= 4) {
+            return (0 until layout.lineCount).joinToString("\n") { line ->
                 clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
             }
         }
@@ -511,8 +557,8 @@ class MainActivity : ComponentActivity() {
         val firstThree = (0 until 3).map { line ->
             clean.substring(layout.getLineStart(line), layout.getLineEnd(line)).trim()
         }
-        val fourth = clean.substring(layout.getLineStart(3)).trim()
-        return (firstThree + fourth).joinToString("\n")
+        val fourthStart = layout.getLineStart(3)
+        return (firstThree + clean.substring(fourthStart).trim()).joinToString("\n")
     }
 
     private fun dynamicHeadlineMetrics(
@@ -530,10 +576,11 @@ class MainActivity : ComponentActivity() {
             3 -> 1f / 3f
             else -> 0.24f
         }
+        val textSize = headlineAreaHeight * fraction
 
         return HeadlineMetrics(
-            textSize = 64f * fraction,
-            lineHeight = headlineAreaHeight / lineCount,
+            textSize = textSize,
+            lineHeight = textSize * 1.05f,
             lineCount = lineCount
         )
     }
@@ -717,11 +764,11 @@ class MainActivity : ComponentActivity() {
         )
         socialIcons.recycle()
 
-        val fullText = wrapHeadlineText(headline, 1010f)
+        val fullText = wrapHeadlineText(headline, 1010f, 270f)
         val wordMatches = Regex("\\S+").findAll(fullText).toList()
         val words = wordMatches.map { it.value }
         // The headline owns exactly the bottom 20%: 270 px of the 1350 px output.
-        // Line allocation is dynamic: 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 25%.
+        // Line allocation is dynamic: 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 24%.
         val socialAreaHeight = height * 0.05f
         val headlineAreaTop = height * 0.75f
         val headlineAreaHeight = height * 0.20f
@@ -738,12 +785,12 @@ class MainActivity : ComponentActivity() {
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
-            .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
+            .setLineSpacing(0f, 1.05f)
             .build()
 
-        // Keep the headline visually close to the social icons without letting the
-        // glyphs collide with them. The icons themselves are 34 px high at the
-        // bottom edge, so leave a compact 14 px visual gap above that row.
+        // Keep the headline as one compact block immediately above the social icons.
+        // Do not distribute the text across the whole 20% zone; the 20% zone
+        // controls the font size, while this anchor controls the final position.
         val iconHeight = 34f
         val gap = 14f
         val targetLastBaseline = height - iconHeight - gap - textPaint.fontMetrics.descent
