@@ -1346,8 +1346,10 @@ class MainActivity : ComponentActivity() {
 
         val words = headline.take(240).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         val textWidth = 1010f
-        val headlineTop = height * 0.735f
-        val headlineBottom = height * 0.945f
+        // Keep the headline clearly above the social-icon row.
+        // The previous bottom edge was too close to the icons on 4:5 exports.
+        val headlineTop = height * 0.700f
+        val headlineBottom = height * 0.890f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
