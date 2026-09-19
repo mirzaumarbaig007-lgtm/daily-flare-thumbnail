@@ -244,6 +244,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 .height(128.dp)
                                 .width(128.dp)
+                                .zIndex(3f)
                                 .clickable { logoPicker.launch(arrayOf("image/*")) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -279,6 +280,7 @@ class MainActivity : ComponentActivity() {
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .height(previewHeadlineHeight * 0.25f)
+                                .zIndex(3f)
                                 .offset(y = -(previewHeadlineHeight + previewSocialHeight)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -862,10 +864,9 @@ class MainActivity : ComponentActivity() {
         val lw = logo.width * scaleLogo
         val lh = logo.height * scaleLogo
 
-        // Shadow is generated only from the logo alpha silhouette, never from
-        // its rectangular container. OUTER keeps the logo itself clean while
-        // the blur dissolves smoothly outward.
-        val padding = 34f
+        // Build every shadow pixel from the logo's actual alpha silhouette.
+        // Nothing is blurred from the rectangular image bounds.
+        val padding = 44f
         val localW = (lw + padding * 2f).toInt().coerceAtLeast(1)
         val localH = (lh + padding * 2f).toInt().coerceAtLeast(1)
 
@@ -881,27 +882,27 @@ class MainActivity : ComponentActivity() {
         val shadowCanvas = Canvas(shadow)
         shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-        val outerShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // Tight contact shadow: noticeably dark immediately behind the artwork.
+        val contactShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            alpha = 155
+            alpha = 220
             maskFilter = android.graphics.BlurMaskFilter(
-                12f,
-                android.graphics.BlurMaskFilter.Blur.OUTER
-            )
-        }
-        shadowCanvas.drawBitmap(mask, 2f, 3f, outerShadow)
-
-        // A restrained inner halo gives a little depth without creating a
-        // hard offset copy or a rectangular/square shadow.
-        val innerShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            alpha = 70
-            maskFilter = android.graphics.BlurMaskFilter(
-                4f,
+                6f,
                 android.graphics.BlurMaskFilter.Blur.NORMAL
             )
         }
-        shadowCanvas.drawBitmap(mask, 1f, 2f, innerShadow)
+        shadowCanvas.drawBitmap(mask, 1f, 2f, contactShadow)
+
+        // Wider halo: black, but progressively dissolving into the photo.
+        val outerShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            alpha = 185
+            maskFilter = android.graphics.BlurMaskFilter(
+                18f,
+                android.graphics.BlurMaskFilter.Blur.NORMAL
+            )
+        }
+        shadowCanvas.drawBitmap(mask, 2f, 3f, outerShadow)
 
         canvas.drawBitmap(
             shadow,
@@ -909,6 +910,8 @@ class MainActivity : ComponentActivity() {
             y - padding,
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
+
+        // The real logo is always the final layer of this helper.
         canvas.drawBitmap(
             logo,
             null,
@@ -983,23 +986,6 @@ class MainActivity : ComponentActivity() {
             android.graphics.RectF(left, top, left + dw, top + dh),
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
-
-        // Logo can be top-left, top-right, or centered above the headline.
-        logo?.let {
-            when (logoPosition) {
-                LogoPosition.LEFT -> drawLogoWithShadow(canvas, it, 48f, 48f, 210f)
-                LogoPosition.RIGHT -> {
-                    val maxLogo = 210f
-                    val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
-                    val lw = it.width * scaleLogo
-                    drawLogoWithShadow(canvas, it, width - 48f - lw, 48f, maxLogo)
-                }
-                LogoPosition.CENTER_BOTTOM -> {
-                    val featureCenterY = height * 0.725f
-                    drawCenterLogoFeature(canvas, it, width, featureCenterY)
-                }
-            }
-        }
 
         // Reference-style black fade rising only around the headline area.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1147,6 +1133,25 @@ class MainActivity : ComponentActivity() {
             }
         }
         canvas.restore()
+
+
+        // Logo is deliberately rendered last so it is above every other export layer.
+        // The shadow remains silhouette-based and therefore can never create a square box.
+        logo?.let {
+            when (logoPosition) {
+                LogoPosition.LEFT -> drawLogoWithShadow(canvas, it, 48f, 48f, 210f)
+                LogoPosition.RIGHT -> {
+                    val maxLogo = 210f
+                    val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+                    val lw = it.width * scaleLogo
+                    drawLogoWithShadow(canvas, it, width - 48f - lw, 48f, maxLogo)
+                }
+                LogoPosition.CENTER_BOTTOM -> {
+                    val featureCenterY = height * 0.725f
+                    drawCenterLogoFeature(canvas, it, width, featureCenterY)
+                }
+            }
+        }
 
         return output
     }
