@@ -265,11 +265,12 @@ class MainActivity : ComponentActivity() {
                         "Social icons",
                         Modifier
                             .align(Alignment.BottomCenter)
-                            // The selected social file is one complete user asset.
-                            // Keep its intrinsic dimensions and aspect ratio; do not
-                            // force it into a 5%-height box or an 80%-width box.
+                            .fillMaxWidth()
+                            .height(previewSocialHeight)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
-                        contentScale = ContentScale.Fit
+                        // Social asset occupies the full 1080px canvas width and
+                        // exactly the bottom 5% (67.5px) of the 1350px output.
+                        contentScale = ContentScale.FillBounds
                     )
                 }
             }
@@ -744,20 +745,20 @@ class MainActivity : ComponentActivity() {
         }
         canvas.restore()
 
-        // Social icons are one complete user-provided image asset.
-        // Do not crop, trim, inspect, redraw, or resize it. Place the supplied
-        // bitmap at 1:1 pixel size, centered horizontally at the bottom. The
-        // bottom 5% remains the designated social area; the asset itself is not
-        // squeezed to make its height equal to 5%.
+        // Social icons use the complete user-provided asset across the
+        // full 1080px output width and the exact bottom 5% = 67.5px.
+        // No crop or trim; the bitmap is drawn into the complete social area.
         socials?.let {
-            val sw = it.width.toFloat()
-            val sh = it.height.toFloat()
-            val x = (width - sw) / 2f
-            val y = height - sh
+            val socialAreaTop = height * 0.95f
             canvas.drawBitmap(
                 it,
-                x,
-                y,
+                null,
+                android.graphics.RectF(
+                    0f,
+                    socialAreaTop,
+                    width.toFloat(),
+                    height.toFloat()
+                ),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
         }
