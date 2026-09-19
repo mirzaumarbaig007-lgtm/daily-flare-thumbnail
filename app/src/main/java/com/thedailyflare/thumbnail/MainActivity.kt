@@ -1425,8 +1425,8 @@ class MainActivity : ComponentActivity() {
                         baseline + textPaint.ascent() + verticalPadding,
                         x + wordWidth + horizontalPadding,
                         baseline + textPaint.descent() - verticalPadding,
-                        5f,
-                        5f,
+                        8f,
+                        8f,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
