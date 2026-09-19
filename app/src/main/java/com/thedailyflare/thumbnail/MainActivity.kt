@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
             }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 2048
+            val maxDimension = 1536
             var sampleSize = 1
             while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
@@ -277,7 +277,18 @@ class MainActivity : ComponentActivity() {
         return try {
             connection.connect()
             if (connection.responseCode !in 200..399) return null
-            val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                val buffer = CharArray(8192)
+                val out = StringBuilder()
+                var total = 0
+                while (total < 1_000_000) {
+                    val read = reader.read(buffer)
+                    if (read <= 0) break
+                    out.append(buffer, 0, read)
+                    total += read
+                }
+                out.toString()
+            }
             val patterns = listOf(
                 Regex("<meta[^>]+property=[\\\"']og:image[\\\"'][^>]+content=[\\\"']([^\\\"']+)[\\\"']", RegexOption.IGNORE_CASE),
                 Regex("<meta[^>]+name=[\\\"']twitter:image[\\\"'][^>]+content=[\\\"']([^\\\"']+)[\\\"']", RegexOption.IGNORE_CASE),
@@ -305,7 +316,7 @@ class MainActivity : ComponentActivity() {
             boundsConnection.disconnect()
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 2048
+            val maxDimension = 1536
             var sampleSize = 1
             while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
@@ -347,6 +358,8 @@ class MainActivity : ComponentActivity() {
         var highlighted by rememberSaveable { mutableStateOf(emptySet<Int>()) }
         var logoPosition by rememberSaveable { mutableStateOf(LogoPosition.LEFT) }
         var showTextPopup by remember { mutableStateOf(false) }
+        var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+        var previewError by remember { mutableStateOf<String?>(null) }
         var rssArticles by remember { mutableStateOf<List<RssArticle>>(emptyList()) }
         var rssLoading by remember { mutableStateOf(true) }
         var rssError by remember { mutableStateOf<String?>(null) }
@@ -381,6 +394,39 @@ class MainActivity : ComponentActivity() {
             kotlinx.coroutines.withContext(Dispatchers.IO) {
                 loadLogoBitmap(logoUri?.let(Uri::parse))
             }.also { logoBitmap = it }
+        }
+
+        // Render the expensive 1080x1350 preview away from the UI thread.
+        // Large gallery/RSS images previously triggered renderThumbnail() during
+        // Compose recomposition, which could crash the app before the preview appeared.
+        LaunchedEffect(mainBitmap, logoBitmap, headline, highlighted, logoPosition) {
+            val source = mainBitmap
+            if (source == null) {
+                previewBitmap = null
+                previewError = null
+            } else {
+                previewBitmap = null
+                previewError = null
+                val rendered = withContext(Dispatchers.Default) {
+                    try {
+                        renderThumbnail(
+                            source,
+                            logoBitmap,
+                            headline.trim().ifBlank { "Daily Flare" },
+                            highlighted,
+                            logoPosition
+                        )
+                    } catch (_: OutOfMemoryError) {
+                        null
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                previewBitmap = rendered
+                if (rendered == null) {
+                    previewError = "Preview could not be rendered. Try a smaller image."
+                }
+            }
         }
 
         LaunchedEffect(Unit) {
@@ -447,24 +493,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 } else {
-                    val previewBitmap = remember(
-                        mainBitmap,
-                        logoBitmap,
-                        headline,
-                        highlighted,
-                        logoPosition
-                    ) {
-                        renderThumbnail(
-                            mainBitmap!!,
-                            logoBitmap,
-                            headline.trim().ifBlank { "Daily Flare" },
-                            highlighted,
-                            logoPosition
-                        )
-                    }
-
                     Image(
-                        previewBitmap.asImageBitmap(),
+                        (previewBitmap ?: mainBitmap)!!.asImageBitmap(),
                         "Final thumbnail preview",
                         Modifier
                             .fillMaxSize()
@@ -1404,8 +1434,6 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             contentResolver.delete(uri, null, null)
             Toast.makeText(this, "Export failed: \${e.message}", Toast.LENGTH_LONG).show()
-        } finally {
-            bitmap.recycle()
         }
     }
 }
