@@ -1345,11 +1345,11 @@ class MainActivity : ComponentActivity() {
         }
 
         val words = headline.take(240).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val textWidth = 1010f
-        // Keep the headline clearly above the social-icon row.
-        // The previous bottom edge was too close to the icons on 4:5 exports.
-        val headlineTop = height * 0.700f
-        val headlineBottom = height * 0.890f
+        val textWidth = 900f
+        // Match the compact reference style: smaller headline, wider side margins,
+        // and a shorter text block while keeping it comfortably above the icons.
+        val headlineTop = height * 0.680f
+        val headlineBottom = height * 0.880f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
@@ -1377,9 +1377,9 @@ class MainActivity : ComponentActivity() {
             return lines
         }
 
-        var textSize = 86f
+        var textSize = 76f
         var lines = makeLines(textSize)
-        while (lines.size > maxLines && textSize > 58f) {
+        while (lines.size > maxLines && textSize > 54f) {
             textSize -= 4f
             lines = makeLines(textSize)
         }
@@ -1393,7 +1393,7 @@ class MainActivity : ComponentActivity() {
             textAlign = Paint.Align.LEFT
         }
 
-        val lineHeight = textSize * 1.05f
+        val lineHeight = textSize * 1.00f
         val blockHeight = lines.size * lineHeight
         val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent()
 
@@ -1418,15 +1418,15 @@ class MainActivity : ComponentActivity() {
                     val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.WHITE
                     }
-                    val horizontalPadding = 3f
-                    val verticalPadding = 7f
+                    val horizontalPadding = 2f
+                    val verticalPadding = 4f
                     canvas.drawRoundRect(
                         x - horizontalPadding,
                         baseline + textPaint.ascent() + verticalPadding,
                         x + wordWidth + horizontalPadding,
                         baseline + textPaint.descent() - verticalPadding,
-                        8f,
-                        8f,
+                        7f,
+                        7f,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
