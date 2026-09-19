@@ -262,6 +262,7 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
+                            .offset(y = -previewSocialHeight)
                             .padding(horizontal = 18.dp, vertical = 0.dp)
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
@@ -285,6 +286,7 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
+                            .offset(y = -previewSocialHeight)
                             .clickable { showTextPopup = true }
                     )
                 }
@@ -580,17 +582,46 @@ class MainActivity : ComponentActivity() {
             3 -> 1f / 3f
             else -> 0.24f
         }
-        // The headline must physically remain inside its 20% zone.
-        // 4 lines nominally use 24% of that zone per line, but glyphs need
-        // internal breathing room. Cap the actual glyph size to 82% of the
-        // per-line slot so every word remains visible inside the zone.
-        val slotHeight = headlineAreaHeight / lineCount
+
+        // Requested size is the design target. It is never allowed to make the
+        // complete headline overflow its hard 20% zone.
         val requestedSize = headlineAreaHeight * fraction
-        val textSize = minOf(requestedSize, slotHeight * 0.82f)
+
+        fun measuredHeight(size: Float): Float {
+            val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                textSize = size
+            }
+            val layout = StaticLayout.Builder.obtain(
+                clean, 0, clean.length, paint, maxWidth.toInt()
+            )
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false)
+                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
+                .setLineSpacing(0f, 1f)
+                .build()
+            return layout.height.toFloat()
+        }
+
+        // Binary-search the largest size that keeps every line inside the zone.
+        var low = 8f
+        var high = requestedSize.coerceAtLeast(low)
+        repeat(12) {
+            val mid = (low + high) / 2f
+            if (measuredHeight(mid) <= headlineAreaHeight) {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+
+        val textSize = low
+        val lineHeight = headlineAreaHeight / lineCount
 
         return HeadlineMetrics(
             textSize = textSize,
-            lineHeight = slotHeight,
+            lineHeight = lineHeight,
             lineCount = lineCount
         )
     }
