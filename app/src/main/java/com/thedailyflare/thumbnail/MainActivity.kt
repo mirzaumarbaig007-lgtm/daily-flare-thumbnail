@@ -726,19 +726,21 @@ class MainActivity : ComponentActivity() {
                 Column {
                     OutlinedTextField(
                         value = text,
-                        onValueChange = {
-                            text = it
-                            val count = it.trim().split(Regex("\\s+")).count { w -> w.isNotEmpty() }
-                            selected = selected.filter { index -> index < count }.toSet()
+                        onValueChange = { value ->
+                            text = value
+                            val count = value.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
+                            selected = selected.filter { it < count }.toSet()
                         },
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         label = { Text("Headline", fontWeight = FontWeight.Bold) },
                         minLines = 2,
                         maxLines = 4
                     )
+
                     Spacer(Modifier.height(12.dp))
                     Text("Tap any word to highlight it:", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -775,12 +777,11 @@ class MainActivity : ComponentActivity() {
                                     )
                                 ) {
                                     Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            word,
+                                            text = word,
                                             fontSize = 13.sp,
                                             lineHeight = 15.sp,
                                             fontWeight = FontWeight.Bold,
@@ -791,7 +792,6 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-}
                 }
             },
             confirmButton = {
@@ -800,7 +800,9 @@ class MainActivity : ComponentActivity() {
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Cancel", fontWeight = FontWeight.Bold) }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", fontWeight = FontWeight.Bold)
+                }
             }
         )
     }
