@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -96,6 +97,18 @@ private enum class LogoPosition {
 }
 
 class MainActivity : ComponentActivity() {
+    private val montserratExtraBoldTypeface: Typeface by lazy {
+        assets.open("Montserrat[wght].ttf").use { input ->
+            Typeface.Builder(input)
+                .setFontVariationSettings("'wght' 800")
+                .build()
+        }
+    }
+
+    private val montserratExtraBoldFontFamily: FontFamily by lazy {
+        FontFamily(montserratExtraBoldTypeface)
+    }
+
     private val prefs by lazy {
         getSharedPreferences("daily_flare_thumbnail", Context.MODE_PRIVATE)
     }
@@ -425,7 +438,8 @@ class MainActivity : ComponentActivity() {
                     androidx.compose.ui.text.SpanStyle(
                         color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
                         background = if (index in highlighted) ComposeColor.White else ComposeColor.Transparent,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = montserratExtraBoldFontFamily
                     )
                 ) { append(match.value) }
 
@@ -478,6 +492,7 @@ class MainActivity : ComponentActivity() {
                     fontSize = fontSp,
                     lineHeight = lineSp,
                     fontWeight = FontWeight.Bold,
+                    fontFamily = montserratExtraBoldFontFamily,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 4,
@@ -544,7 +559,7 @@ class MainActivity : ComponentActivity() {
 
         fun paintFor(size: Float): TextPaint =
             TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                typeface = montserratExtraBoldTypeface
                 textSize = size
             }
 
@@ -658,7 +673,7 @@ class MainActivity : ComponentActivity() {
 
         fun measuredHeight(size: Float): Float {
             val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                typeface = montserratExtraBoldTypeface
                 textSize = size
             }
             val layout = StaticLayout.Builder.obtain(
@@ -973,7 +988,7 @@ class MainActivity : ComponentActivity() {
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = metrics.textSize
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = montserratExtraBoldTypeface
         }
 
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
