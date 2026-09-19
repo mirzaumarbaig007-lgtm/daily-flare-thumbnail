@@ -519,7 +519,7 @@ class MainActivity : ComponentActivity() {
         )
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
-            .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+            .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
             .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
             .setLineSpacing(0f, 1f)
             .build()
@@ -597,7 +597,7 @@ class MainActivity : ComponentActivity() {
             )
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setIncludePad(false)
-                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
                 .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
                 .setLineSpacing(0f, 1f)
                 .build()
@@ -864,7 +864,7 @@ class MainActivity : ComponentActivity() {
                 // metrics, which made the first highlighted line visibly taller.
                 val baseline = layout.getLineBaseline(groupLine).toFloat()
                 val fm = textPaint.fontMetrics
-                val verticalPad = 6f
+                val verticalPad = 2.5f
                 val boxTop = baseline + fm.ascent - verticalPad
                 val boxBottom = baseline + fm.descent + verticalPad
                 canvas.drawRect(
