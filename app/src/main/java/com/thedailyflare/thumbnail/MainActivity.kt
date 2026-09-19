@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(logoUri) { logoBitmap = loadLogoBitmap(logoUri?.let(Uri::parse)) }
 
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Daily Flare Thumbnail", fontSize = 22.sp, fontWeight = FontWeight.Bold)
