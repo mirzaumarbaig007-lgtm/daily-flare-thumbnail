@@ -814,18 +814,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
             flushGroup()
-                        groupLeft = minOf(left, right)
-                        groupRight = maxOf(left, right)
-                        groupLine = line
-                        hasGroup = true
-                    }
-                } else {
-                    flushGroup()
-                }
-
-                offset += word.length + 1
-            }
-            flushGroup()
         }
 
         layout.draw(canvas)
