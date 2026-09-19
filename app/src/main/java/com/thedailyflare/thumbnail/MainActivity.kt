@@ -204,6 +204,40 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Social icons: a small bottom strip in their final position.
+                if (socialsBitmap == null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(previewSocialHeight)
+                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
+                        color = ComposeColor.White.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Select your social icons",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                } else {
+                    Image(
+                        socialsBitmap!!.asImageBitmap(),
+                        "Social icons",
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(previewSocialHeight)
+                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
+                        // Social asset occupies the full 1080px canvas width and
+                        // exactly the bottom 15% (202.5px) of the 1350px output.
+                        contentScale = ContentScale.FillBounds
+                    )
+                }
+
                 // Headline: click the final text area to open the text/highlight editor.
                 if (headline.isBlank()) {
                     Surface(
@@ -240,39 +274,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Social icons: a small bottom strip in their final position.
-                if (socialsBitmap == null) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(previewSocialHeight)
-                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
-                        color = ComposeColor.White.copy(alpha = 0.88f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                "Select your social icons",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                } else {
-                    Image(
-                        socialsBitmap!!.asImageBitmap(),
-                        "Social icons",
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(previewSocialHeight)
-                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
-                        // Social asset occupies the full 1080px canvas width and
-                        // exactly the bottom 15% (202.5px) of the 1350px output.
-                        contentScale = ContentScale.FillBounds
-                    )
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -327,6 +328,25 @@ class MainActivity : ComponentActivity() {
         modifier: Modifier
     ) {
         if (headline.isBlank()) return
+
+        // Draw social asset first so headline text renders above it.
+        // Social icons use the complete user-provided asset across the
+        // full 1080px output width and the exact bottom 15% = 202.5px.
+        // No crop or trim; the bitmap is drawn into the complete social area.
+        socials?.let {
+            val socialAreaTop = height * 0.85f
+            canvas.drawBitmap(
+                it,
+                null,
+                android.graphics.RectF(
+                    0f,
+                    socialAreaTop,
+                    width.toFloat(),
+                    height.toFloat()
+                ),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+        }
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val annotated = buildAnnotatedString {
@@ -762,24 +782,6 @@ class MainActivity : ComponentActivity() {
             }
         }
         canvas.restore()
-
-        // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 15% = 202.5px.
-        // No crop or trim; the bitmap is drawn into the complete social area.
-        socials?.let {
-            val socialAreaTop = height * 0.85f
-            canvas.drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(
-                    0f,
-                    socialAreaTop,
-                    width.toFloat(),
-                    height.toFloat()
-                ),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-        }
 
         return output
     }
