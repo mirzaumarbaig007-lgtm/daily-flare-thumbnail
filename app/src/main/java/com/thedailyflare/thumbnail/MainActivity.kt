@@ -328,25 +328,6 @@ class MainActivity : ComponentActivity() {
     ) {
         if (headline.isBlank()) return
 
-        // Draw social asset before headline so headline text stays on top.
-        // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 15% = 202.5px.
-        // No crop or trim; the bitmap is drawn into the complete social area.
-        socials?.let {
-            val socialAreaTop = height * 0.85f
-            canvas.drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(
-                    0f,
-                    socialAreaTop,
-                    width.toFloat(),
-                    height.toFloat()
-                ),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-        }
-
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val annotated = buildAnnotatedString {
             words.forEachIndexed { index, word ->
@@ -781,6 +762,28 @@ class MainActivity : ComponentActivity() {
             }
         }
         canvas.restore()
+
+        // Social icons use the complete user-provided asset across the
+        // full 1080px output width and the exact bottom 15% = 202.5px.
+        // No crop or trim; the bitmap is drawn into the complete social area.
+        socials?.let {
+            val socialAreaTop = height * 0.85f
+            canvas.drawBitmap(
+                it,
+                null,
+                android.graphics.RectF(
+                    0f,
+                    socialAreaTop,
+                    width.toFloat(),
+                    height.toFloat()
+                ),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                    xfermode = android.graphics.PorterDuffXfermode(
+                        android.graphics.PorterDuff.Mode.DST_OVER
+                    )
+                }
+            )
+        }
 
         return output
     }
