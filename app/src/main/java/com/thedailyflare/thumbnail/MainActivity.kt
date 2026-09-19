@@ -1107,7 +1107,7 @@ class MainActivity : ComponentActivity() {
                 // metrics, which made the first highlighted line visibly taller.
                 val baseline = layout.getLineBaseline(groupLine).toFloat()
                 val fm = textPaint.fontMetrics
-                val verticalPad = 2.5f
+                val verticalPad = 0.5f
                 val boxTop = baseline + fm.ascent - verticalPad
                 val boxBottom = baseline + fm.descent + verticalPad
                 canvas.drawRect(
