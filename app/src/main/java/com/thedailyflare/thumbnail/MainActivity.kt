@@ -793,11 +793,19 @@ class MainActivity : ComponentActivity() {
 
             fun flushGroup() {
                 if (!hasGroup || groupLine < 0) return
+                // Use the same glyph-based vertical box for every line.
+                // StaticLayout lineTop/lineBottom can include line-specific font
+                // metrics, which made the first highlighted line visibly taller.
+                val baseline = layout.getLineBaseline(groupLine).toFloat()
+                val fm = textPaint.fontMetrics
+                val verticalPad = 6f
+                val boxTop = baseline + fm.ascent - verticalPad
+                val boxBottom = baseline + fm.descent + verticalPad
                 canvas.drawRect(
                     groupLeft - 6f,
-                    layout.getLineTop(groupLine).toFloat(),
+                    boxTop,
                     groupRight + 6f,
-                    layout.getLineBottom(groupLine).toFloat(),
+                    boxBottom,
                     highlightPaint
                 )
                 hasGroup = false
