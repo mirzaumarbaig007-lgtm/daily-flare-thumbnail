@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
             }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 1536
+            val maxDimension = 1024
             var sampleSize = 1
             while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
@@ -212,7 +212,28 @@ class MainActivity : ComponentActivity() {
         return result
     }
 
-    private fun loadLogoBitmap(uri: Uri?): Bitmap? = loadBitmap(uri)?.let(::cleanLogoBitmap)
+    private fun loadLogoBitmap(uri: Uri?): Bitmap? {
+        val source = loadBitmap(uri) ?: return null
+        return try {
+            val maxLogoDimension = 512
+            val scale = minOf(
+                1f,
+                maxLogoDimension.toFloat() / source.width.toFloat(),
+                maxLogoDimension.toFloat() / source.height.toFloat()
+            )
+            val resized = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    source,
+                    (source.width * scale).toInt().coerceAtLeast(1),
+                    (source.height * scale).toInt().coerceAtLeast(1),
+                    true
+                ).also { if (it !== source) source.recycle() }
+            } else source
+            cleanLogoBitmap(resized)
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
     private fun openHttpConnection(url: String): HttpURLConnection {
         return (URL(url).openConnection() as HttpURLConnection).apply {
@@ -385,16 +406,12 @@ class MainActivity : ComponentActivity() {
             if (uri != null) {
                 persistUri(uri, "logo_uri")
                 logoUri = uri.toString()
-                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                    val bitmap = loadLogoBitmap(uri)
-                    withContext(Dispatchers.Main) { logoBitmap = bitmap }
-                }
             }
         }
         LaunchedEffect(logoUri) {
-            kotlinx.coroutines.withContext(Dispatchers.IO) {
-                loadLogoBitmap(logoUri?.let(Uri::parse))
-            }.also { logoBitmap = it }
+            val uri = logoUri?.let(Uri::parse) ?: return@LaunchedEffect
+            val bitmap = withContext(Dispatchers.IO) { loadLogoBitmap(uri) }
+            logoBitmap = bitmap
         }
 
         // Render the expensive 1080x1350 preview away from the UI thread.
