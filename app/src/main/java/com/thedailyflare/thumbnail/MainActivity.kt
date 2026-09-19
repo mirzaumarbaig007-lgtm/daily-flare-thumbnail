@@ -1410,14 +1410,19 @@ class MainActivity : ComponentActivity() {
                 val word = words[wordIndex]
                 val wordWidth = textPaint.measureText(word)
                 if (wordIndex in highlighted) {
+                    // Keep adjacent highlighted words visually separate while preserving
+                    // the normal word-space between them. The old padding made neighboring
+                    // highlight boxes touch and made the boxes too tall between lines.
                     val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.WHITE
                     }
+                    val horizontalPadding = 3f
+                    val verticalPadding = 7f
                     canvas.drawRect(
-                        x - 6f,
-                        baseline + textPaint.ascent() - 2f,
-                        x + wordWidth + 6f,
-                        baseline + textPaint.descent() + 2f,
+                        x - horizontalPadding,
+                        baseline + textPaint.ascent() + verticalPadding,
+                        x + wordWidth + horizontalPadding,
+                        baseline + textPaint.descent() - verticalPadding,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
