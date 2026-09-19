@@ -500,60 +500,54 @@ class MainActivity : ComponentActivity() {
         }
 
         /*
-         * The headline zone is exactly 20% of the output height.
+         * Solve the line count and font size together.
          *
-         * We first determine the natural wrapped line count using a large
-         * reference size, capped at four lines. Then the font size is derived
-         * directly from that count:
+         * The headline zone is 20% of the canvas. Once the actual wrapped line
+         * count is known, each line receives an equal vertical slot:
          *
-         *   1 line -> 100% of the headline zone
+         *   1 line -> 100% of the zone
          *   2 lines -> 50% per line
-         *   3 lines -> 33% per line
-         *   4 lines -> 24% per line
+         *   3 lines -> 33.33% per line
+         *   4 lines -> 25% per line
          *
-         * The important part is that textSize is recalculated from the slot
-         * height, rather than being allowed to remain almost constant.
+         * Starting at four slots and repeatedly re-wrapping at the resulting
+         * font size gives us a stable line count instead of keeping a nearly
+         * constant font size as text gets longer.
          */
-        var probeSize = headlineAreaHeight
-        var probeLayout = layoutFor(probeSize)
+        var lineCount = 4
+        var size = headlineAreaHeight / lineCount
 
-        // Reduce the probe until the headline can be represented in at most
-        // four lines. This is only used to establish the intended line count.
-        var guard = 0
-        while (probeLayout.lineCount > 4 && guard++ < 24) {
-            probeSize *= 0.88f
-            probeLayout = layoutFor(probeSize)
-        }
-
-        var lineCount = probeLayout.lineCount.coerceIn(1, 4)
-
-        // Solve the font size from the per-line vertical slot. Re-check the
-        // wrapping after every change because font size also affects wrapping.
-        var size = headlineAreaHeight / lineCount * 0.88f
         repeat(12) {
-            paint.textSize = size
-            val fm = paint.fontMetrics
-            val glyphHeight = fm.descent - fm.ascent
             val slotHeight = headlineAreaHeight / lineCount
-            val targetGlyphHeight = slotHeight * 0.82f
+            paint.textSize = slotHeight
+            val fm = paint.fontMetrics
+            val glyphHeight = (fm.descent - fm.ascent).coerceAtLeast(1f)
 
-            size *= targetGlyphHeight / glyphHeight
-            val actual = layoutFor(size).lineCount.coerceIn(1, 4)
+            // Leave a little breathing room inside each allocated line slot.
+            size = slotHeight * 0.82f / glyphHeight * size
 
-            if (actual == lineCount) return@repeat
-            lineCount = actual
+            // Because glyphHeight scales with text size, normalize the
+            // calculation from the actual font metrics at the candidate size.
+            paint.textSize = size
+            val candidateFm = paint.fontMetrics
+            val candidateGlyphHeight =
+                (candidateFm.descent - candidateFm.ascent).coerceAtLeast(1f)
+            size *= (slotHeight * 0.82f) / candidateGlyphHeight
+
+            val actualLines = layoutFor(size).lineCount.coerceIn(1, 4)
+            if (actualLines == lineCount) return@repeat
+            lineCount = actualLines
         }
 
-        // Final pass: make the font occupy the correct fraction of the zone
-        // for the final wrapped line count.
+        // Final sizing pass for the stabilized line count.
         val finalSlot = headlineAreaHeight / lineCount
-        paint.textSize = size
-        val finalGlyphHeight =
-            paint.fontMetrics.descent - paint.fontMetrics.ascent
-        size *= (finalSlot * 0.82f) / finalGlyphHeight
+        paint.textSize = finalSlot
+        val fm = paint.fontMetrics
+        val glyphHeight = (fm.descent - fm.ascent).coerceAtLeast(1f)
+        val finalSize = finalSlot * 0.82f / glyphHeight * finalSlot
 
         return HeadlineMetrics(
-            textSize = size,
+            textSize = finalSize,
             lineHeight = finalSlot,
             lineCount = lineCount
         )
@@ -777,8 +771,9 @@ class MainActivity : ComponentActivity() {
         // bottom edge, so leave a compact 14 px visual gap above that row.
         val iconHeight = 34f
         val gap = 14f
-        val textBottom = height - iconHeight - gap
-        val textTop = textBottom - metrics.lineHeight * metrics.lineCount
+        val targetLastBaseline = height - iconHeight - gap - textPaint.fontMetrics.descent
+        val layoutLastBaseline = layout.getLineBaseline(layout.lineCount - 1).toFloat()
+        val textTop = targetLastBaseline - layoutLastBaseline
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
