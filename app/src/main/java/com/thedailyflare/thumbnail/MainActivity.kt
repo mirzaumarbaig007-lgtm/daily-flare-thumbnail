@@ -499,6 +499,7 @@ class MainActivity : ComponentActivity() {
                         "Final thumbnail preview",
                         Modifier
                             .fillMaxSize()
+                            .zIndex(-1f)
                             .clickable { mainPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.FillBounds
                     )
