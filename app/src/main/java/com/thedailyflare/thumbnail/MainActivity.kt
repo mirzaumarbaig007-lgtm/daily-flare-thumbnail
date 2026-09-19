@@ -117,6 +117,12 @@ class MainActivity : ComponentActivity() {
         val pixels = IntArray(w * h)
         source.getPixels(pixels, 0, w, 0, 0, w, h)
 
+        /*
+         * The logo artwork is white. Do not use the logo's brightness as a
+         * semi-transparent shadow or matte. Instead create a clean binary-ish
+         * alpha silhouette: dark background = transparent, bright artwork =
+         * opaque, with only a narrow transition for anti-aliased edges.
+         */
         for (i in pixels.indices) {
             val p = pixels[i]
             val srcAlpha = Color.alpha(p)
@@ -130,23 +136,17 @@ class MainActivity : ComponentActivity() {
                 0.587f * Color.green(p) +
                 0.114f * Color.blue(p)
 
-            // The supplied TDF logo is white artwork on a dark square matte.
-            // The matte must disappear completely; otherwise it becomes a
-            // visible rectangular background behind the logo.
-            //
-            // Keep bright logo pixels and a narrow anti-aliased transition,
-            // while making the entire dark/grey matte transparent.
             val alpha = when {
-                luminance <= 90f -> 0f
-                luminance >= 180f -> srcAlpha.toFloat()
-                else -> srcAlpha * ((luminance - 90f) / 90f)
+                luminance <= 100f -> 0f
+                luminance >= 170f -> srcAlpha.toFloat()
+                else -> srcAlpha * ((luminance - 100f) / 70f)
             }
 
             pixels[i] = Color.argb(
                 alpha.toInt().coerceIn(0, 255),
-                Color.red(p),
-                Color.green(p),
-                Color.blue(p)
+                255,
+                255,
+                255
             )
         }
 
@@ -657,65 +657,55 @@ class MainActivity : ComponentActivity() {
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
 
-        // Large top-left logo with a silhouette-only soft shadow.
+        // Large top-left logo with a true silhouette shadow.
         logo?.let {
             val maxLogo = 210f
-            val s = minOf(maxLogo / it.width, maxLogo / it.height)
-            val lw = it.width * s
-            val lh = it.height * s
+            val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+            val lw = it.width * scaleLogo
+            val lh = it.height * scaleLogo
             val x = 48f
             val y = 48f
 
-            // Build a small local alpha mask from the cleaned logo itself.
-            // This guarantees the shadow can never become a rectangular box.
-            val blurRadius = 13f
-            val shadowPadding = 26f
-            val localW = (lw + shadowPadding * 2f).toInt().coerceAtLeast(1)
-            val localH = (lh + shadowPadding * 2f).toInt().coerceAtLeast(1)
-
+            // Make a local alpha silhouette from the cleaned logo. The blur is
+            // performed on this small local mask, so no canvas-sized rectangle
+            // can ever participate in the shadow.
+            val padding = 30f
+            val localW = (lw + padding * 2f).toInt().coerceAtLeast(1)
+            val localH = (lh + padding * 2f).toInt().coerceAtLeast(1)
             val mask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
-            val maskCanvas = Canvas(mask)
-            maskCanvas.drawBitmap(
+            Canvas(mask).drawBitmap(
                 it,
                 null,
                 android.graphics.RectF(
-                    shadowPadding,
-                    shadowPadding,
-                    shadowPadding + lw,
-                    shadowPadding + lh
+                    padding, padding, padding + lw, padding + lh
                 ),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
 
-            val blurred = mask.extractAlpha(
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    maskFilter = android.graphics.BlurMaskFilter(
-                        blurRadius,
-                        android.graphics.BlurMaskFilter.Blur.NORMAL
-                    )
-                },
-                null
+            val shadow = Bitmap.createBitmap(
+                localW, localH, Bitmap.Config.ARGB_8888
             )
-
-            val shadow = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
             val shadowCanvas = Canvas(shadow)
-            shadowCanvas.drawColor(Color.BLACK)
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            shadowPaint.xfermode = android.graphics.PorterDuffXfermode(
-                android.graphics.PorterDuff.Mode.DST_IN
-            )
-            shadowCanvas.drawBitmap(blurred, 0f, 0f, shadowPaint)
-            shadowPaint.xfermode = null
-            shadowPaint.alpha = 125
+            shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                alpha = 150
+                maskFilter = android.graphics.BlurMaskFilter(
+                    14f,
+                    android.graphics.BlurMaskFilter.Blur.NORMAL
+                )
+            }
+            shadowCanvas.drawBitmap(mask, 0f, 4f, shadowPaint)
 
             canvas.drawBitmap(
                 shadow,
-                x - shadowPadding,
-                y - shadowPadding + 4f,
-                shadowPaint
+                x - padding,
+                y - padding,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
 
-            // Draw the cleaned logo itself on top of its silhouette shadow.
+            // Logo is always drawn after the shadow, fully opaque.
             canvas.drawBitmap(
                 it,
                 null,
@@ -724,7 +714,6 @@ class MainActivity : ComponentActivity() {
             )
 
             shadow.recycle()
-            blurred.recycle()
             mask.recycle()
         }
 
