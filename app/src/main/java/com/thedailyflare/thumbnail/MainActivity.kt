@@ -1393,7 +1393,7 @@ class MainActivity : ComponentActivity() {
 
         val lineHeight = textSize * 1.05f
         val blockHeight = lines.size * lineHeight
-        val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent
+        val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent()
 
         lines.forEachIndexed { lineIndex, lineWords ->
             var lineWidth = 0f
@@ -1415,9 +1415,9 @@ class MainActivity : ComponentActivity() {
                     }
                     canvas.drawRect(
                         x - 6f,
-                        baseline + textPaint.ascent - 2f,
+                        baseline + textPaint.ascent() - 2f,
                         x + wordWidth + 6f,
-                        baseline + textPaint.descent + 2f,
+                        baseline + textPaint.descent() + 2f,
                         highlightPaint
                     )
                     textPaint.color = Color.BLACK
