@@ -130,12 +130,16 @@ class MainActivity : ComponentActivity() {
                 0.587f * Color.green(p) +
                 0.114f * Color.blue(p)
 
-            // White TDF artwork stays opaque. Dark/black matte becomes
-            // transparent. A short transition preserves anti-aliased edges.
+            // The supplied TDF logo is white artwork on a dark square matte.
+            // The matte must disappear completely; otherwise it becomes a
+            // visible rectangular background behind the logo.
+            //
+            // Keep bright logo pixels and a narrow anti-aliased transition,
+            // while making the entire dark/grey matte transparent.
             val alpha = when {
-                luminance <= 48f -> 0f
-                luminance >= 150f -> srcAlpha.toFloat()
-                else -> srcAlpha * ((luminance - 48f) / 102f)
+                luminance <= 90f -> 0f
+                luminance >= 180f -> srcAlpha.toFloat()
+                else -> srcAlpha * ((luminance - 90f) / 90f)
             }
 
             pixels[i] = Color.argb(
