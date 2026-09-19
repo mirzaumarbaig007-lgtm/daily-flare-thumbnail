@@ -1569,41 +1569,67 @@ class MainActivity : ComponentActivity() {
         return output
     }
 
-    private fun saveThumbnail(bitmap: Bitmap, headline: String) {
+    private suspend fun saveThumbnail(bitmap: Bitmap, headline: String) {
         val time = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val safeTitle = headline.lowercase(Locale.US)
             .replace("[^a-z0-9]+".toRegex(), "-").trim('-').take(55)
             .ifBlank { "daily-flare-thumbnail" }
         val filename = "DF-$safeTitle-$time.jpg"
 
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Daily Flare")
-        }
-        val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-            ?: run {
-                Toast.makeText(this, "Could not create image file", Toast.LENGTH_SHORT).show()
-                return
-            }
-
         try {
-            val success = contentResolver.openOutputStream(uri)?.use {
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
-            } ?: false
-
-            if (success) {
-                Toast.makeText(this, "Thumbnail saved to Pictures/Daily Flare", Toast.LENGTH_LONG).show()
-            } else {
-                contentResolver.delete(uri, null, null)
-                Toast.makeText(this, "Export failed: Could not write image.", Toast.LENGTH_LONG).show()
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Daily Flare")
             }
-        } catch (_: OutOfMemoryError) {
-            contentResolver.delete(uri, null, null)
-            Toast.makeText(this, "Export ran out of memory. Try again.", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            contentResolver.delete(uri, null, null)
-            Toast.makeText(this, "Export failed: " + (e.message ?: "unknown error"), Toast.LENGTH_LONG).show()
+            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: run {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Could not create image file", Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+
+            try {
+                val success = contentResolver.openOutputStream(uri)?.use {
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it)
+                } ?: false
+
+                if (success) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Thumbnail saved to Pictures/Daily Flare",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                } else {
+                    contentResolver.delete(uri, null, null)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Export failed: Could not write image.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Throwable) {
+                contentResolver.delete(uri, null, null)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Export failed: " + (e.message ?: "unknown error"),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } finally {
+                // The preview bitmap can still be referenced by Compose.
+                // Do not recycle it here.
+            }
+        } catch (e: Throwable) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Export failed safely: " + (e.message ?: "unknown error"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 }
