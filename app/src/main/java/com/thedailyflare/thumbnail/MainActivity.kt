@@ -600,33 +600,37 @@ class MainActivity : ComponentActivity() {
             val localW = (lw + shadowPadding * 2f).toInt().coerceAtLeast(1)
             val localH = (lh + shadowPadding * 2f).toInt().coerceAtLeast(1)
 
-            // Build the shadow from the visible TDF mark itself.
-            // The TDF mark is white while its rectangular backing is dark, so
-            // luminance is converted into the shadow mask. This keeps the shadow
-            // attached to the logo silhouette rather than its rectangular bounds.
-            val logoMask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
-            val maskCanvas = Canvas(logoMask)
-            val luminanceMatrix = android.graphics.ColorMatrix(
-                floatArrayOf(
-                    0f, 0f, 0f, 0f, 0f,
-                    0f, 0f, 0f, 0f, 0f,
-                    0f, 0f, 0f, 0f, 0f,
-                    0.2126f, 0.7152f, 0.0722f, 0f, 0f
-                )
-            )
-            val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-                colorFilter = android.graphics.ColorMatrixColorFilter(luminanceMatrix)
+            // Build the shadow from the visible TDF mark itself, not from the
+            // rectangular bounds of the logo bitmap. If the supplied logo has a
+            // solid/dark background, that background is excluded from the mask.
+            val logoMask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
+            val src = it.copy(Bitmap.Config.ARGB_8888, false)
+            val pixels = IntArray(src.width * src.height)
+            src.getPixels(pixels, 0, src.width, 0, 0, src.width, src.height)
+            val maskPixels = ByteArray(localW * localH)
+            for (py in 0 until src.height) {
+                for (px in 0 until src.width) {
+                    val p = pixels[py * src.width + px]
+                    val a = android.graphics.Color.alpha(p)
+                    val r = android.graphics.Color.red(p)
+                    val g = android.graphics.Color.green(p)
+                    val b = android.graphics.Color.blue(p)
+                    val luminance = (0.2126f * r + 0.7152f * g + 0.0722f * b)
+                    // White TDF mark remains solid; black/dark rectangular backing
+                    // contributes no shadow. Transparent pixels remain transparent.
+                    val visible = if (a == 0) 0f else ((luminance - 18f) / 237f).coerceIn(0f, 1f)
+                    val maskAlpha = (a / 255f * visible * 255f).toInt()
+                    val mx = shadowPadding.toInt() + (px * lw / src.width).toInt()
+                    val my = shadowPadding.toInt() + (py * lh / src.height).toInt()
+                    if (mx in 0 until localW && my in 0 until localH) {
+                        val idx = my * localW + mx
+                        if (maskAlpha > (maskPixels[idx].toInt() and 0xFF)) {
+                            maskPixels[idx] = maskAlpha.toByte()
+                        }
+                    }
+                }
             }
-            maskCanvas.drawBitmap(
-                it, null,
-                android.graphics.RectF(
-                    shadowPadding,
-                    shadowPadding,
-                    shadowPadding + lw,
-                    shadowPadding + lh
-                ),
-                maskPaint
-            )
+            logoMask.setPixels(maskPixels.map { it.toInt() and 0xFF }.toIntArray(), 0, localW, 0, 0, localW, localH)
 
             val blurred = logoMask.extractAlpha(
                 Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -641,8 +645,9 @@ class MainActivity : ComponentActivity() {
             // Black pixels are masked only by the blurred TDF silhouette.
             val shadow = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
             val shadowCanvas = Canvas(shadow)
-            shadowCanvas.drawColor(Color.BLACK)
+            shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
             val blackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            shadowCanvas.drawColor(Color.BLACK)
             blackPaint.xfermode = android.graphics.PorterDuffXfermode(
                 android.graphics.PorterDuff.Mode.DST_IN
             )
