@@ -636,7 +636,10 @@ class MainActivity : ComponentActivity() {
                             // Export from a fresh background render. Never depend on the
                             // Compose preview bitmap, which can be stale or unavailable.
                             val bitmapToSave = try {
-                                renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
+                                // Use the crash-safe Canvas renderer for the final image.
+                                // It intentionally avoids StaticLayout/font-asset initialization
+                                // while preserving word highlights and social icons.
+                                renderSafeThumbnail(source, logoBitmap, title, highlighted, logoPosition)
                             } catch (_: Throwable) {
                                 try {
                                     renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
@@ -1284,6 +1287,190 @@ class MainActivity : ComponentActivity() {
             centerY,
             linePaint
         )
+    }
+
+    private fun renderSafeThumbnail(
+        source: Bitmap,
+        logo: Bitmap?,
+        headline: String,
+        highlighted: Set<Int>,
+        logoPosition: LogoPosition
+    ): Bitmap {
+        // Stable final renderer: simple Canvas text layout only.
+        // This keeps export independent from StaticLayout and the variable font asset.
+        val width = 1080
+        val height = 1350
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+
+        val scale = maxOf(width.toFloat() / source.width, height.toFloat() / source.height)
+        val dw = source.width * scale
+        val dh = source.height * scale
+        val left = (width - dw) / 2f
+        val top = (height - dh) / 2f
+        canvas.drawBitmap(
+            source,
+            null,
+            android.graphics.RectF(left, top, left + dw, top + dh),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+
+        val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f, height * 0.58f, 0f, height.toFloat(),
+                intArrayOf(
+                    Color.TRANSPARENT,
+                    Color.argb(80, 0, 0, 0),
+                    Color.argb(180, 0, 0, 0),
+                    Color.argb(248, 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.42f, 0.72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, height * 0.58f, width.toFloat(), height.toFloat(), fade)
+
+        // Social icons are part of the exported image, not just the preview.
+        try {
+            val socialIcons = renderSocialIconsBitmap(width, 72)
+            canvas.drawBitmap(
+                socialIcons,
+                0f,
+                height - socialIcons.height.toFloat(),
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+            socialIcons.recycle()
+        } catch (_: Throwable) {
+            // Keep export usable if a device cannot load the bundled icon drawable.
+        }
+
+        val words = headline.take(240).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val textWidth = 1010f
+        val headlineTop = height * 0.735f
+        val headlineBottom = height * 0.945f
+        val maxLines = 4
+
+        fun makeLines(textSize: Float): List<List<Int>> {
+            val measurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.textSize = textSize
+                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            }
+            val lines = mutableListOf<MutableList<Int>>()
+            var current = mutableListOf<Int>()
+            var currentWidth = 0f
+
+            words.forEachIndexed { index, word ->
+                val wordWidth = measurePaint.measureText(word)
+                val spaceWidth = if (current.isEmpty()) 0f else measurePaint.measureText(" ")
+                if (current.isNotEmpty() && currentWidth + spaceWidth + wordWidth > textWidth) {
+                    lines += current
+                    current = mutableListOf(index)
+                    currentWidth = wordWidth
+                } else {
+                    current += index
+                    currentWidth += spaceWidth + wordWidth
+                }
+            }
+            if (current.isNotEmpty()) lines += current
+            return lines
+        }
+
+        var textSize = 86f
+        var lines = makeLines(textSize)
+        while (lines.size > maxLines && textSize > 58f) {
+            textSize -= 4f
+            lines = makeLines(textSize)
+        }
+        if (lines.size > maxLines) {
+            lines = lines.take(maxLines).map { it.toMutableList() }
+        }
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            this.textSize = textSize
+            textAlign = Paint.Align.LEFT
+        }
+
+        val lineHeight = textSize * 1.05f
+        val blockHeight = lines.size * lineHeight
+        val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent
+
+        lines.forEachIndexed { lineIndex, lineWords ->
+            var lineWidth = 0f
+            lineWords.forEachIndexed { position, wordIndex ->
+                if (position > 0) lineWidth += textPaint.measureText(" ")
+                lineWidth += textPaint.measureText(words[wordIndex])
+            }
+
+            var x = (width - lineWidth) / 2f
+            val baseline = startBaseline + lineIndex * lineHeight
+            lineWords.forEachIndexed { position, wordIndex ->
+                if (position > 0) x += textPaint.measureText(" ")
+
+                val word = words[wordIndex]
+                val wordWidth = textPaint.measureText(word)
+                if (wordIndex in highlighted) {
+                    val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.WHITE
+                    }
+                    canvas.drawRect(
+                        x - 6f,
+                        baseline + textPaint.ascent - 2f,
+                        x + wordWidth + 6f,
+                        baseline + textPaint.descent + 2f,
+                        highlightPaint
+                    )
+                    textPaint.color = Color.BLACK
+                } else {
+                    textPaint.color = Color.WHITE
+                }
+                canvas.drawText(word, x, baseline, textPaint)
+                x += wordWidth
+            }
+        }
+
+        // Logo remains the top/final branding layer, as before.
+        logo?.let {
+            try {
+                when (logoPosition) {
+                    LogoPosition.LEFT -> drawLogoWithShadow(canvas, it, 48f, 48f, 210f)
+                    LogoPosition.RIGHT -> {
+                        val maxLogo = 210f
+                        val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+                        val lw = it.width * scaleLogo
+                        drawLogoWithShadow(canvas, it, width - 48f - lw, 48f, maxLogo)
+                    }
+                    LogoPosition.CENTER_BOTTOM -> {
+                        drawCenterLogoFeature(canvas, it, width, height * 0.725f)
+                    }
+                }
+            } catch (_: Throwable) {
+                // Simple logo fallback; never let branding break export.
+                try {
+                    val maxLogo = 210f
+                    val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+                    val lw = it.width * scaleLogo
+                    val lh = it.height * scaleLogo
+                    val x = when (logoPosition) {
+                        LogoPosition.LEFT -> 48f
+                        LogoPosition.RIGHT -> width - 48f - lw
+                        LogoPosition.CENTER_BOTTOM -> (width - lw) / 2f
+                    }
+                    val y = when (logoPosition) {
+                        LogoPosition.CENTER_BOTTOM -> height * 0.725f - lh / 2f
+                        else -> 48f
+                    }
+                    canvas.drawBitmap(
+                        it,
+                        null,
+                        android.graphics.RectF(x, y, x + lw, y + lh),
+                        Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                    )
+                } catch (_: Throwable) {}
+            }
+        }
+
+        return output
     }
 
     private fun renderThumbnail(
