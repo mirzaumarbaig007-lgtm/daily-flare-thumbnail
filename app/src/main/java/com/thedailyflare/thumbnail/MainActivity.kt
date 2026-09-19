@@ -513,16 +513,41 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    HeadlinePreview(
-                        headline = headline,
-                        highlighted = highlighted,
-                        headlineHeight = previewHeadlineHeight,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .offset(y = -(maxHeight * 0.05f))
-                            .zIndex(2f)
-                            .clickable { showTextPopup = true }
-                    )
+                    // Lightweight live headline overlay. Keep text editing independent
+                    // from the bitmap renderer so submitting text cannot trigger a large
+                    // StaticLayout/renderThumbnail allocation.
+                    if (headline.isNotBlank()) {
+                        val displayWords = headline.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                        val annotatedHeadline = buildAnnotatedString {
+                            displayWords.forEachIndexed { index, word ->
+                                withStyle(
+                                    androidx.compose.ui.text.SpanStyle(
+                                        color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
+                                        background = if (index in highlighted) ComposeColor.White else ComposeColor.Transparent,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontFamily = montserratExtraBoldFontFamily
+                                    )
+                                ) { append(word) }
+                                if (index < displayWords.lastIndex) append(" ")
+                            }
+                        }
+                        Text(
+                            text = annotatedHeadline,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(previewHeadlineHeight)
+                                .offset(y = -(maxHeight * 0.05f))
+                                .zIndex(2f)
+                                .clickable { showTextPopup = true }
+                                .padding(horizontal = 18.dp, vertical = 10.dp),
+                            fontSize = 28.sp,
+                            lineHeight = 30.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     when (logoPosition) {
                         LogoPosition.LEFT -> {
