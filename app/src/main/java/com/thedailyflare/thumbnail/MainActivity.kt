@@ -488,7 +488,9 @@ class MainActivity : ComponentActivity() {
 
         fun layoutFor(size: Float): StaticLayout {
             paint.textSize = size
-            return StaticLayout.Builder.obtain(clean, 0, clean.length, paint, maxWidth.toInt())
+            return StaticLayout.Builder.obtain(
+                clean, 0, clean.length, paint, maxWidth.toInt()
+            )
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setIncludePad(false)
                 .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
@@ -497,58 +499,65 @@ class MainActivity : ComponentActivity() {
                 .build()
         }
 
-        // Find the largest readable size that stays within four word-wrapped lines.
-        var low = 8f
-        var high = headlineAreaHeight
-        repeat(24) {
-            val mid = (low + high) / 2f
-            if (layoutFor(mid).lineCount <= 4) low = mid else high = mid
+        /*
+         * The headline zone is exactly 20% of the output height.
+         *
+         * We first determine the natural wrapped line count using a large
+         * reference size, capped at four lines. Then the font size is derived
+         * directly from that count:
+         *
+         *   1 line -> 100% of the headline zone
+         *   2 lines -> 50% per line
+         *   3 lines -> 33% per line
+         *   4 lines -> 24% per line
+         *
+         * The important part is that textSize is recalculated from the slot
+         * height, rather than being allowed to remain almost constant.
+         */
+        var probeSize = headlineAreaHeight
+        var probeLayout = layoutFor(probeSize)
+
+        // Reduce the probe until the headline can be represented in at most
+        // four lines. This is only used to establish the intended line count.
+        var guard = 0
+        while (probeLayout.lineCount > 4 && guard++ < 24) {
+            probeSize *= 0.88f
+            probeLayout = layoutFor(probeSize)
         }
 
-        var size = low
-        var layout = layoutFor(size)
-        var lineCount = layout.lineCount.coerceIn(1, 4)
+        var lineCount = probeLayout.lineCount.coerceIn(1, 4)
 
-        // Explicit line-count sizing: each line gets an equal share of the
-        // headline area. More lines therefore produce a smaller font.
-        repeat(32) {
-            val slotHeight = headlineAreaHeight / lineCount
+        // Solve the font size from the per-line vertical slot. Re-check the
+        // wrapping after every change because font size also affects wrapping.
+        var size = headlineAreaHeight / lineCount * 0.88f
+        repeat(12) {
             paint.textSize = size
-            val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-            val targetGlyphHeight = slotHeight * 0.84f
+            val fm = paint.fontMetrics
+            val glyphHeight = fm.descent - fm.ascent
+            val slotHeight = headlineAreaHeight / lineCount
+            val targetGlyphHeight = slotHeight * 0.82f
 
-            if (glyphHeight > targetGlyphHeight) {
-                size *= targetGlyphHeight / glyphHeight
-            } else {
-                val candidate = layoutFor(size * 1.015f)
-                if (candidate.lineCount <= 4 && candidate.lineCount == lineCount) {
-                    size *= 1.015f
-                } else {
-                    return@repeat
-                }
-            }
+            size *= targetGlyphHeight / glyphHeight
+            val actual = layoutFor(size).lineCount.coerceIn(1, 4)
 
-            layout = layoutFor(size)
-            lineCount = layout.lineCount.coerceIn(1, 4)
+            if (actual == lineCount) return@repeat
+            lineCount = actual
         }
 
-        layout = layoutFor(size)
-        lineCount = layout.lineCount.coerceIn(1, 4)
-
-        val slotHeight = headlineAreaHeight / lineCount
+        // Final pass: make the font occupy the correct fraction of the zone
+        // for the final wrapped line count.
+        val finalSlot = headlineAreaHeight / lineCount
         paint.textSize = size
-        val glyphHeight = paint.fontMetrics.descent - paint.fontMetrics.ascent
-        if (glyphHeight > slotHeight * 0.84f) {
-            size *= (slotHeight * 0.84f) / glyphHeight
-        }
+        val finalGlyphHeight =
+            paint.fontMetrics.descent - paint.fontMetrics.ascent
+        size *= (finalSlot * 0.82f) / finalGlyphHeight
 
         return HeadlineMetrics(
             textSize = size,
-            lineHeight = headlineAreaHeight / lineCount,
+            lineHeight = finalSlot,
             lineCount = lineCount
         )
     }
-
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
