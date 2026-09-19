@@ -808,26 +808,30 @@ class MainActivity : ComponentActivity() {
             val shadowCanvas = Canvas(shadow)
             shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-            // A stronger but still soft silhouette shadow. Because the source
-            // is ALPHA_8, only the actual white logo artwork is blurred.
+            // Soft black silhouette shadow: dark close to the logo, then
+            // naturally dissolving outward. Do NOT add a crisp edge layer;
+            // that makes the shadow look like a solid offset copy.
             val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
-                alpha = 185
+                alpha = 115
                 maskFilter = android.graphics.BlurMaskFilter(
-                    11f,
+                    15f,
                     android.graphics.BlurMaskFilter.Blur.NORMAL
                 )
             }
-            shadowCanvas.drawBitmap(mask, 0f, 5f, shadowPaint)
+            shadowCanvas.drawBitmap(mask, 2f, 3f, shadowPaint)
 
-            // Add a small crisp offset silhouette underneath the blur. This
-            // makes the shadow visible even on bright backgrounds while still
-            // following the logo contours exactly.
-            val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            // A smaller, darker inner blur gives the logo a subtle 3D lift
+            // while the larger blur provides the gradual fade.
+            val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.BLACK
-                alpha = 80
+                alpha = 55
+                maskFilter = android.graphics.BlurMaskFilter(
+                    6f,
+                    android.graphics.BlurMaskFilter.Blur.NORMAL
+                )
             }
-            shadowCanvas.drawBitmap(mask, 2f, 5f, edgePaint)
+            shadowCanvas.drawBitmap(mask, 1f, 2f, innerShadowPaint)
 
             canvas.drawBitmap(
                 shadow,
