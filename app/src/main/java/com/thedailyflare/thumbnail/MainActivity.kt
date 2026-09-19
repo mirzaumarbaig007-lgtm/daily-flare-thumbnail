@@ -500,48 +500,59 @@ class MainActivity : ComponentActivity() {
         }
 
         /*
-         * Solve the line count and font size together.
+         * The font size is deliberately tied to the final line count.
+         * We test the four possible designs independently instead of
+         * repeatedly changing the font and chasing a moving line count.
          *
-         * The headline zone is 20% of the canvas. Once the actual wrapped line
-         * count is known, each line receives an equal vertical slot:
+         * 1 line -> 100% of the headline zone
+         * 2 lines -> 50% per line
+         * 3 lines -> 33.33% per line
+         * 4 lines -> 24% visual text height per line
          *
-         *   1 line -> 100% of the zone
-         *   2 lines -> 50% per line
-         *   3 lines -> 33.33% per line
-         *   4 lines -> 25% per line
-         *
-         * Starting at four slots and repeatedly re-wrapping at the resulting
-         * font size gives us a stable line count instead of keeping a nearly
-         * constant font size as text gets longer.
+         * A candidate is valid only when the font size derived for that
+         * line-count slot actually wraps the headline into that same number
+         * of lines. This keeps the relationship deterministic.
          */
-        var lineCount = 4
-        var size = headlineAreaHeight / lineCount
+        val slotFractions = floatArrayOf(1f, 0.5f, 1f / 3f, 0.24f)
 
-        repeat(12) {
-            val slotHeight = headlineAreaHeight / lineCount
-            // Font metrics scale linearly with textSize, so measure a known
-            // reference size and derive the exact size for this line slot.
+        var chosenLines = 4
+        var chosenSize = 1f
+
+        // Prefer the fewest lines that can stably use its assigned slot.
+        for (candidateLines in 1..4) {
+            val slotHeight = headlineAreaHeight / candidateLines
+            val targetGlyphHeight = slotHeight * slotFractions[candidateLines - 1]
+
             paint.textSize = 100f
             val referenceGlyphHeight =
                 (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
-            size = 100f * (slotHeight * 0.82f) / referenceGlyphHeight
+            val candidateSize =
+                100f * targetGlyphHeight / referenceGlyphHeight
 
-            val actualLines = layoutFor(size).lineCount.coerceIn(1, 4)
-            if (actualLines == lineCount) return@repeat
-            lineCount = actualLines
+            val actualLines = layoutFor(candidateSize).lineCount
+            if (actualLines == candidateLines) {
+                chosenLines = candidateLines
+                chosenSize = candidateSize
+                break
+            }
         }
 
-        // Final sizing pass for the stabilized line count.
-        val finalSlot = headlineAreaHeight / lineCount
-        paint.textSize = 100f
-        val finalGlyphHeight =
-            (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
-        val finalSize = 100f * (finalSlot * 0.82f) / finalGlyphHeight
+        // If no exact fixed point exists, use the four-line design as the
+        // safe maximum and keep the font tied to that slot.
+        if (chosenSize <= 1f) {
+            val slotHeight = headlineAreaHeight / 4f
+            paint.textSize = 100f
+            val referenceGlyphHeight =
+                (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
+            chosenSize =
+                100f * (slotHeight * slotFractions[3]) / referenceGlyphHeight
+            chosenLines = 4
+        }
 
         return HeadlineMetrics(
-            textSize = finalSize,
-            lineHeight = finalSlot,
-            lineCount = lineCount
+            textSize = chosenSize,
+            lineHeight = headlineAreaHeight / chosenLines,
+            lineCount = chosenLines
         )
     }
 
