@@ -379,8 +379,6 @@ class MainActivity : ComponentActivity() {
         var highlighted by rememberSaveable { mutableStateOf(emptySet<Int>()) }
         var logoPosition by rememberSaveable { mutableStateOf(LogoPosition.LEFT) }
         var showTextPopup by remember { mutableStateOf(false) }
-        var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
-        var previewError by remember { mutableStateOf<String?>(null) }
         var rssArticles by remember { mutableStateOf<List<RssArticle>>(emptyList()) }
         var rssLoading by remember { mutableStateOf(true) }
         var rssError by remember { mutableStateOf<String?>(null) }
@@ -414,13 +412,6 @@ class MainActivity : ComponentActivity() {
             logoBitmap = bitmap
         }
 
-        // IMPORTANT: Do not render a second 1080x1350 bitmap when an image is
-        // selected. The previous live-preview renderer was the remaining source
-        // of selection-time crashes. The editor preview is now composed directly
-        // from the source bitmap plus lightweight Compose overlays. Export still
-        // performs its own background render.
-        previewBitmap = null
-        previewError = null
 
         LaunchedEffect(Unit) {
             rssLoading = true
