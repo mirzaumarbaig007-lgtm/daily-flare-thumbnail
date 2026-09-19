@@ -748,6 +748,8 @@ class MainActivity : ComponentActivity() {
         val headlineAreaTop = height * 0.75f
         val headlineAreaHeight = height * 0.20f
         val textWidth = 1010
+        // Use the full 20% headline zone for sizing, but position the finished
+        // block immediately above the bottom social icons.
         val metrics = dynamicHeadlineMetrics(fullText, textWidth.toFloat(), headlineAreaHeight)
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -761,10 +763,12 @@ class MainActivity : ComponentActivity() {
             .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
             .build()
 
-        // Keep the headline close to the social icons. The text baseline area ends
-        // only 4% of the canvas above the bottom edge, while the social icons remain
-        // bottom-aligned in their 20% social area.
-        val textBottom = height * 0.96f
+        // Keep the headline visually close to the social icons without letting the
+        // glyphs collide with them. The icons themselves are 34 px high at the
+        // bottom edge, so leave a compact 14 px visual gap above that row.
+        val iconHeight = 34f
+        val gap = 14f
+        val textBottom = height - iconHeight - gap
         val textTop = textBottom - metrics.lineHeight * metrics.lineCount
 
         canvas.save()
