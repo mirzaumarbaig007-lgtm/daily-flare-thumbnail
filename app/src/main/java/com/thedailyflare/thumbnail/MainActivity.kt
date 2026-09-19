@@ -755,7 +755,6 @@ class MainActivity : ComponentActivity() {
                                 val isSelected = index in selected
                                 Surface(
                                     modifier = Modifier
-                                        .wrapContentWidth()
                                         .height(28.dp)
                                         .clickable {
                                             selected = if (isSelected) selected - index else selected + index
@@ -777,7 +776,6 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxHeight()
                                             .padding(horizontal = 8.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
