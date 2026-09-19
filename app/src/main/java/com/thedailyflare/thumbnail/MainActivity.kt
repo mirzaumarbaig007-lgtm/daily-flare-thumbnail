@@ -98,11 +98,8 @@ private enum class LogoPosition {
 
 class MainActivity : ComponentActivity() {
     private val montserratExtraBoldTypeface: Typeface by lazy {
-        assets.open("Montserrat[wght].ttf").use { input ->
-            Typeface.Builder(input)
-                .setFontVariationSettings("'wght' 800")
-                .build()
-        }
+        val variableTypeface = Typeface.createFromAsset(assets, "Montserrat[wght].ttf")
+        Typeface.create(variableTypeface, 800, false)
     }
 
     private val montserratExtraBoldFontFamily: FontFamily by lazy {
