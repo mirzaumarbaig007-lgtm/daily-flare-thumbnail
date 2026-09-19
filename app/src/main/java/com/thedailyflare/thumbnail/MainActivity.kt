@@ -89,6 +89,12 @@ private object SimpleIconsLocal {
     val youtube get() = Youtube
 }
 
+private enum class LogoPosition {
+    LEFT,
+    RIGHT,
+    CENTER_BOTTOM
+}
+
 class MainActivity : ComponentActivity() {
     private val prefs by lazy {
         getSharedPreferences("daily_flare_thumbnail", Context.MODE_PRIVATE)
@@ -170,6 +176,7 @@ class MainActivity : ComponentActivity() {
         var logoBitmap by remember { mutableStateOf<Bitmap?>(null) }
         var headline by rememberSaveable { mutableStateOf("") }
         var highlighted by rememberSaveable { mutableStateOf(emptySet<Int>()) }
+        var logoPosition by rememberSaveable { mutableStateOf(LogoPosition.LEFT) }
         var showTextPopup by remember { mutableStateOf(false) }
 
         val mainPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -220,38 +227,104 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Logo: match the reference output — large, top-left, with a soft shadow.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 28.dp, top = 24.dp)
-                        .height(128.dp)
-                        .width(128.dp)
-                        .clickable { logoPicker.launch(arrayOf("image/*")) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (logoBitmap == null) {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = ComposeColor.Black.copy(alpha = 0.28f),
-                            shape = RoundedCornerShape(8.dp)
+                // Logo feature has three positions:
+                // Left (default), Right, or Bottom-Center above the headline.
+                when (logoPosition) {
+                    LogoPosition.LEFT, LogoPosition.RIGHT -> {
+                        Box(
+                            modifier = Modifier
+                                .align(
+                                    if (logoPosition == LogoPosition.LEFT)
+                                        Alignment.TopStart else Alignment.TopEnd
+                                )
+                                .padding(
+                                    start = if (logoPosition == LogoPosition.LEFT) 28.dp else 0.dp,
+                                    end = if (logoPosition == LogoPosition.RIGHT) 28.dp else 0.dp,
+                                    top = 24.dp
+                                )
+                                .height(128.dp)
+                                .width(128.dp)
+                                .clickable { logoPicker.launch(arrayOf("image/*")) },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    "Select logo",
-                                    color = ComposeColor.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
+                            if (logoBitmap == null) {
+                                Surface(
+                                    modifier = Modifier.fillMaxSize(),
+                                    color = ComposeColor.Black.copy(alpha = 0.28f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "Select logo",
+                                            color = ComposeColor.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            } else {
+                                Image(
+                                    logoBitmap!!.asImageBitmap(),
+                                    "Logo",
+                                    Modifier.fillMaxSize().padding(4.dp),
+                                    contentScale = ContentScale.Fit
                                 )
                             }
                         }
-                    } else {
-                        Image(
-                            logoBitmap!!.asImageBitmap(),
-                            "Logo",
-                            Modifier.fillMaxSize().padding(4.dp),
-                            contentScale = ContentScale.Fit
-                        )
+                    }
+
+                    LogoPosition.CENTER_BOTTOM -> {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(previewHeadlineHeight * 0.25f)
+                                .offset(y = -(previewHeadlineHeight + previewSocialHeight)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            androidx.compose.foundation.Canvas(
+                                Modifier.fillMaxSize()
+                            ) {
+                                val centerY = size.height / 2f
+                                val logoGap = 28.dp.toPx()
+                                val sidePadding = 22.dp.toPx()
+                                drawLine(
+                                    color = ComposeColor.White.copy(alpha = 0.88f),
+                                    start = androidx.compose.ui.geometry.Offset(sidePadding, centerY),
+                                    end = androidx.compose.ui.geometry.Offset(size.width / 2f - logoGap, centerY),
+                                    strokeWidth = 1.5.dp.toPx()
+                                )
+                                drawLine(
+                                    color = ComposeColor.White.copy(alpha = 0.88f),
+                                    start = androidx.compose.ui.geometry.Offset(size.width / 2f + logoGap, centerY),
+                                    end = androidx.compose.ui.geometry.Offset(size.width - sidePadding, centerY),
+                                    strokeWidth = 1.5.dp.toPx()
+                                )
+                            }
+
+                            Box(
+                                Modifier
+                                    .size(42.dp)
+                                    .clickable { logoPicker.launch(arrayOf("image/*")) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (logoBitmap == null) {
+                                    Text(
+                                        "＋",
+                                        color = ComposeColor.White,
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                } else {
+                                    Image(
+                                        logoBitmap!!.asImageBitmap(),
+                                        "Bottom logo",
+                                        Modifier.fillMaxSize().padding(4.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -303,6 +376,32 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            Spacer(Modifier.height(10.dp))
+            Text("Logo position", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                FilterChip(
+                    selected = logoPosition == LogoPosition.LEFT,
+                    onClick = { logoPosition = LogoPosition.LEFT },
+                    label = { Text("Left") }
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = logoPosition == LogoPosition.RIGHT,
+                    onClick = { logoPosition = LogoPosition.RIGHT },
+                    label = { Text("Right") }
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = logoPosition == LogoPosition.CENTER_BOTTOM,
+                    onClick = { logoPosition = LogoPosition.CENTER_BOTTOM },
+                    label = { Text("Bottom") }
+                )
+            }
+
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.Center) {
                 Button(
@@ -311,7 +410,7 @@ class MainActivity : ComponentActivity() {
                         mainBitmap?.let {
                             val title = headline.trim().ifBlank { "Daily Flare" }
                             saveThumbnail(
-                                renderThumbnail(it, logoBitmap, title, highlighted),
+                                renderThumbnail(it, logoBitmap, title, highlighted, logoPosition),
                                 title
                             )
                         }
@@ -449,8 +548,8 @@ class MainActivity : ComponentActivity() {
                         Brush.verticalGradient(
                             listOf(
                                 ComposeColor.Transparent,
-                                ComposeColor.Black.copy(alpha = 0.82f),
-                                ComposeColor.Black.copy(alpha = 0.98f)
+                                ComposeColor.Black.copy(alpha = 0.58f),
+                                ComposeColor.Black.copy(alpha = 0.96f)
                             )
                         )
                     )
@@ -752,11 +851,120 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun drawLogoWithShadow(
+        canvas: Canvas,
+        logo: Bitmap,
+        x: Float,
+        y: Float,
+        maxLogo: Float
+    ) {
+        val scaleLogo = minOf(maxLogo / logo.width, maxLogo / logo.height)
+        val lw = logo.width * scaleLogo
+        val lh = logo.height * scaleLogo
+
+        // Shadow is generated only from the logo alpha silhouette, never from
+        // its rectangular container. OUTER keeps the logo itself clean while
+        // the blur dissolves smoothly outward.
+        val padding = 34f
+        val localW = (lw + padding * 2f).toInt().coerceAtLeast(1)
+        val localH = (lh + padding * 2f).toInt().coerceAtLeast(1)
+
+        val mask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
+        Canvas(mask).drawBitmap(
+            logo,
+            null,
+            android.graphics.RectF(padding, padding, padding + lw, padding + lh),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+
+        val shadow = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
+        val shadowCanvas = Canvas(shadow)
+        shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+
+        val outerShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            alpha = 155
+            maskFilter = android.graphics.BlurMaskFilter(
+                12f,
+                android.graphics.BlurMaskFilter.Blur.OUTER
+            )
+        }
+        shadowCanvas.drawBitmap(mask, 2f, 3f, outerShadow)
+
+        // A restrained inner halo gives a little depth without creating a
+        // hard offset copy or a rectangular/square shadow.
+        val innerShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            alpha = 70
+            maskFilter = android.graphics.BlurMaskFilter(
+                4f,
+                android.graphics.BlurMaskFilter.Blur.NORMAL
+            )
+        }
+        shadowCanvas.drawBitmap(mask, 1f, 2f, innerShadow)
+
+        canvas.drawBitmap(
+            shadow,
+            x - padding,
+            y - padding,
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+        canvas.drawBitmap(
+            logo,
+            null,
+            android.graphics.RectF(x, y, x + lw, y + lh),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+
+        shadow.recycle()
+        mask.recycle()
+    }
+
+    private fun drawCenterLogoFeature(
+        canvas: Canvas,
+        logo: Bitmap,
+        width: Int,
+        centerY: Float
+    ) {
+        val maxLogo = 42f
+        val scaleLogo = minOf(maxLogo / logo.width, maxLogo / logo.height)
+        val lw = logo.width * scaleLogo
+        val lh = logo.height * scaleLogo
+        val x = (width - lw) / 2f
+        val y = centerY - lh / 2f
+
+        drawLogoWithShadow(canvas, logo, x, y, maxLogo)
+
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = 215
+            strokeWidth = 1.5f
+            style = Paint.Style.STROKE
+        }
+        val lineGap = 34f
+        val sidePadding = 40f
+        canvas.drawLine(
+            sidePadding,
+            centerY,
+            width / 2f - lineGap,
+            centerY,
+            linePaint
+        )
+        canvas.drawLine(
+            width / 2f + lineGap,
+            centerY,
+            width - sidePadding,
+            centerY,
+            linePaint
+        )
+    }
+
     private fun renderThumbnail(
         source: Bitmap,
         logo: Bitmap?,
         headline: String,
-        highlighted: Set<Int>
+        highlighted: Set<Int>,
+        logoPosition: LogoPosition
     ): Bitmap {
         // Reference output is 4:5, 1080x1350.
         val width = 1080
@@ -776,96 +984,38 @@ class MainActivity : ComponentActivity() {
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
 
-        // Large top-left logo with a true silhouette shadow.
+        // Logo can be top-left, top-right, or centered above the headline.
         logo?.let {
-            val maxLogo = 210f
-            val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
-            val lw = it.width * scaleLogo
-            val lh = it.height * scaleLogo
-            val x = 48f
-            val y = 48f
-
-            // Build the shadow ONLY from the logo's alpha silhouette.
-            // Never blur a rectangular/logo-container bitmap: that creates the
-            // unwanted square shadow seen in earlier versions.
-            val padding = 38f
-            val localW = (lw + padding * 2f).toInt().coerceAtLeast(1)
-            val localH = (lh + padding * 2f).toInt().coerceAtLeast(1)
-
-            val mask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
-            Canvas(mask).drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(
-                    padding, padding, padding + lw, padding + lh
-                ),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-
-            val shadow = Bitmap.createBitmap(
-                localW, localH, Bitmap.Config.ARGB_8888
-            )
-            val shadowCanvas = Canvas(shadow)
-            shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
-
-            // Soft black silhouette shadow: dark close to the logo, then
-            // naturally dissolving outward. Do NOT add a crisp edge layer;
-            // that makes the shadow look like a solid offset copy.
-            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.BLACK
-                alpha = 115
-                maskFilter = android.graphics.BlurMaskFilter(
-                    15f,
-                    android.graphics.BlurMaskFilter.Blur.NORMAL
-                )
+            when (logoPosition) {
+                LogoPosition.LEFT -> drawLogoWithShadow(canvas, it, 48f, 48f, 210f)
+                LogoPosition.RIGHT -> {
+                    val maxLogo = 210f
+                    val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+                    val lw = it.width * scaleLogo
+                    drawLogoWithShadow(canvas, it, width - 48f - lw, 48f, maxLogo)
+                }
+                LogoPosition.CENTER_BOTTOM -> {
+                    val featureCenterY = height * 0.725f
+                    drawCenterLogoFeature(canvas, it, width, featureCenterY)
+                }
             }
-            shadowCanvas.drawBitmap(mask, 2f, 3f, shadowPaint)
-
-            // A smaller, darker inner blur gives the logo a subtle 3D lift
-            // while the larger blur provides the gradual fade.
-            val innerShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.BLACK
-                alpha = 55
-                maskFilter = android.graphics.BlurMaskFilter(
-                    6f,
-                    android.graphics.BlurMaskFilter.Blur.NORMAL
-                )
-            }
-            shadowCanvas.drawBitmap(mask, 1f, 2f, innerShadowPaint)
-
-            canvas.drawBitmap(
-                shadow,
-                x - padding,
-                y - padding,
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-
-            // Logo is always drawn after the shadow, fully opaque.
-            canvas.drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(x, y, x + lw, y + lh),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-
-            shadow.recycle()
-            mask.recycle()
         }
 
-        // Reference-style black fade rising behind the headline.
+        // Reference-style black fade rising only around the headline area.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, height * 0.48f, 0f, height * 0.92f,
+                0f, height * 0.60f, 0f, height * 0.91f,
                 intArrayOf(
                     Color.TRANSPARENT,
-                    Color.argb(190, 0, 0, 0),
+                    Color.argb(150, 0, 0, 0),
+                    Color.argb(238, 0, 0, 0),
                     Color.argb(250, 0, 0, 0)
                 ),
-                floatArrayOf(0f, 0.68f, 1f),
+                floatArrayOf(0f, 0.42f, 0.78f, 1f),
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
+        canvas.drawRect(0f, height * 0.60f, width.toFloat(), height.toFloat(), fade)
 
         // Draw the same bundled vector icons used by the preview.
         // The icon row is rendered locally into a transparent bitmap only for
