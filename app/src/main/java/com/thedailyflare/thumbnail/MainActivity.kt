@@ -328,7 +328,7 @@ class MainActivity : ComponentActivity() {
         val drawable = androidx.core.content.ContextCompat.getDrawable(this, R.drawable.social_icons_white)
             ?: return bitmap
         val iconHeight = 34
-        val iconWidth = (168f * iconHeight / 24f).toInt()
+        val iconWidth = (264f * iconHeight / 24f).toInt()
         drawable.setBounds(
             (width - iconWidth) / 2,
             height - iconHeight,
@@ -703,35 +703,42 @@ class MainActivity : ComponentActivity() {
             .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
             .build()
 
-        // Keep the headline 12.5% of the full canvas height above the bottom edge.
-        // This leaves the social layer underneath/behind the lower part of the text.
-        val textBottom = height * 0.875f
+        // Keep the headline close to the social icons. The text baseline area ends
+        // only 4% of the canvas above the bottom edge, while the social icons remain
+        // bottom-aligned in their 20% social area.
+        val textBottom = height * 0.96f
         val textTop = textBottom - metrics.lineHeight * metrics.lineCount
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
 
-        // Draw exact white highlight rectangles behind selected words.
+        // Draw tight white highlight rectangles behind the actual glyph runs.
+        // Adjacent highlighted words on the same line are merged, including their
+        // real intervening space. A wrapped word starts a new rectangle.
         if (highlighted.isNotEmpty()) {
             val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
             var offset = 0
-            var groupStartOffset = -1
-            var groupEndOffset = -1
+            var groupLeft = 0f
+            var groupRight = 0f
             var groupLine = -1
+            var hasGroup = false
 
-            fun drawGroup() {
-                if (groupStartOffset < 0 || groupEndOffset < 0 || groupLine < 0) return
-                val x1 = layout.getPrimaryHorizontal(groupStartOffset)
-                val x2 = layout.getPrimaryHorizontal(groupEndOffset)
+            fun wordRight(start: Int, end: Int): Float {
+                if (end <= start) return layout.getPrimaryHorizontal(start)
+                val last = end - 1
+                return layout.getPrimaryHorizontal(last) + textPaint.measureText(fullText[last].toString())
+            }
+
+            fun flushGroup() {
+                if (!hasGroup || groupLine < 0) return
                 canvas.drawRect(
-                    minOf(x1, x2) - 5f,
+                    groupLeft - 6f,
                     layout.getLineTop(groupLine).toFloat(),
-                    maxOf(x1, x2) + 5f,
+                    groupRight + 6f,
                     layout.getLineBottom(groupLine).toFloat(),
                     highlightPaint
                 )
-                groupStartOffset = -1
-                groupEndOffset = -1
+                hasGroup = false
                 groupLine = -1
             }
 
@@ -739,29 +746,32 @@ class MainActivity : ComponentActivity() {
                 val startOffset = offset
                 val endOffset = startOffset + word.length
                 val line = layout.getLineForOffset(startOffset)
-                val isHighlighted = index in highlighted
 
-                if (isHighlighted) {
-                    if (groupStartOffset >= 0 && line == groupLine) {
-                        // Include the real space between adjacent highlighted words.
-                        groupEndOffset = endOffset
+                if (index in highlighted) {
+                    val left = layout.getPrimaryHorizontal(startOffset)
+                    val right = wordRight(startOffset, endOffset)
+
+                    if (hasGroup && line == groupLine) {
+                        groupRight = maxOf(groupRight, right)
                     } else {
-                        drawGroup()
-                        groupStartOffset = startOffset
-                        groupEndOffset = endOffset
+                        flushGroup()
+                        groupLeft = minOf(left, right)
+                        groupRight = maxOf(left, right)
                         groupLine = line
+                        hasGroup = true
                     }
                 } else {
-                    drawGroup()
+                    flushGroup()
                 }
+
                 offset += word.length + 1
             }
-            drawGroup()
+            flushGroup()
         }
 
         layout.draw(canvas)
 
-        // Redraw selected words in black on their white rectangles.
+        // Redraw selected words in black exactly where StaticLayout placed them.
         if (highlighted.isNotEmpty()) {
             val blackPaint = TextPaint(textPaint).apply { color = Color.BLACK }
             var offset = 0
@@ -769,9 +779,10 @@ class MainActivity : ComponentActivity() {
                 if (index in highlighted) {
                     val startOffset = offset
                     val line = layout.getLineForOffset(startOffset)
+                    val x = layout.getPrimaryHorizontal(startOffset)
                     canvas.drawText(
                         word,
-                        layout.getPrimaryHorizontal(startOffset),
+                        x,
                         layout.getLineBaseline(line).toFloat(),
                         blackPaint
                     )
