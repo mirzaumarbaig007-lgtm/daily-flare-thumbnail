@@ -466,7 +466,9 @@ class MainActivity : ComponentActivity() {
                     lineHeight = lineSp,
                     fontWeight = FontWeight.Bold,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 4,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Clip
                 )
             }
         }
@@ -579,13 +581,16 @@ class MainActivity : ComponentActivity() {
             else -> 0.24f
         }
         // The headline must physically remain inside its 20% zone.
-        // For four lines, 24% is the requested nominal scale; 1.02 line
-        // spacing prevents the block from spilling into the social row.
-        val textSize = headlineAreaHeight * fraction
+        // 4 lines nominally use 24% of that zone per line, but glyphs need
+        // internal breathing room. Cap the actual glyph size to 82% of the
+        // per-line slot so every word remains visible inside the zone.
+        val slotHeight = headlineAreaHeight / lineCount
+        val requestedSize = headlineAreaHeight * fraction
+        val textSize = minOf(requestedSize, slotHeight * 0.82f)
 
         return HeadlineMetrics(
             textSize = textSize,
-            lineHeight = textSize * 1.02f,
+            lineHeight = slotHeight,
             lineCount = lineCount
         )
     }
@@ -760,7 +765,7 @@ class MainActivity : ComponentActivity() {
         // Draw the same bundled vector icons used by the preview.
         // The icon row is rendered locally into a transparent bitmap only for
         // the final JPG export; there is no network dependency.
-        val socialIcons = renderSocialIconsBitmap(width, (height * 0.20f).toInt())
+        val socialIcons = renderSocialIconsBitmap(width, (height * 0.05f).toInt())
         canvas.drawBitmap(
             socialIcons,
             0f,
@@ -790,7 +795,7 @@ class MainActivity : ComponentActivity() {
         val layout = StaticLayout.Builder.obtain(fullText, 0, fullText.length, textPaint, textWidth)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
             .setIncludePad(false)
-            .setLineSpacing(0f, 1.02f)
+            .setLineSpacing(0f, 1f)
             .build()
 
         // Keep the headline as one compact block immediately above the social icons.
