@@ -281,7 +281,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     XmlPullParser.END_TAG -> if (parser.name.equals("item", true) || parser.name.equals("entry", true)) {
-                        if (title.isNotBlank() && link.isNotBlank()) articles += RssArticle(title, link, imageUrl)
+                        if (title.isNotBlank() && link.isNotBlank()) articles += RssArticle(title.take(240), link, imageUrl)
+                        if (articles.size >= 30) return@try articles
                         insideItem = false
                     }
                 }
@@ -339,7 +340,7 @@ class MainActivity : ComponentActivity() {
             boundsConnection.disconnect()
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-            val maxDimension = 1536
+            val maxDimension = 768
             var sampleSize = 1
             while (bounds.outWidth / sampleSize > maxDimension || bounds.outHeight / sampleSize > maxDimension) {
                 sampleSize *= 2
@@ -429,12 +430,13 @@ class MainActivity : ComponentActivity() {
         }
 
         fun chooseArticle(article: RssArticle) {
-            selectedArticleTitle = article.title
-            headline = article.title
+            val safeTitle = article.title.take(240).trim()
+            selectedArticleTitle = safeTitle
+            headline = safeTitle
             showRssDialog = false
             mainBitmap = null
-            headline = article.title
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            headline = safeTitle
+            exportScope.launch(Dispatchers.IO) {
                 val imageUrl = findFeaturedImageUrl(article)
                 val bitmap = downloadBitmap(imageUrl)
                 withContext(Dispatchers.Main) {
@@ -519,15 +521,15 @@ class MainActivity : ComponentActivity() {
                     // from the bitmap renderer so submitting text cannot trigger a large
                     // StaticLayout/renderThumbnail allocation.
                     if (headline.isNotBlank()) {
-                        val displayWords = headline.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                        val safeHeadline = headline.take(240)
+                        val displayWords = safeHeadline.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
                         val annotatedHeadline = buildAnnotatedString {
                             displayWords.forEachIndexed { index, word ->
                                 withStyle(
                                     androidx.compose.ui.text.SpanStyle(
                                         color = if (index in highlighted) ComposeColor.Black else ComposeColor.White,
                                         background = if (index in highlighted) ComposeColor.White else ComposeColor.Transparent,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontFamily = montserratExtraBoldFontFamily
+                                        fontWeight = FontWeight.ExtraBold
                                     )
                                 ) { append(word) }
                                 if (index < displayWords.lastIndex) append(" ")
@@ -1083,7 +1085,7 @@ class MainActivity : ComponentActivity() {
         onDismiss: () -> Unit,
         onApply: (String, Set<Int>) -> Unit
     ) {
-        var text by remember { mutableStateOf(initialText) }
+        var text by remember { mutableStateOf(initialText.take(240)) }
         var selected by remember { mutableStateOf(initialHighlighted) }
         val words = text.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
 
@@ -1095,7 +1097,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = text,
                         onValueChange = { value ->
-                            text = value
+                            text = value.take(240)
                             val count = value.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
                             selected = selected.filter { it < count }.toSet()
                         },
