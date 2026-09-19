@@ -525,7 +525,12 @@ class MainActivity : ComponentActivity() {
         // Prefer the fewest lines that can stably use its assigned slot.
         for (candidateLines in 1..4) {
             val slotHeight = headlineAreaHeight / candidateLines
-            val targetGlyphHeight = slotHeight * slotFractions[candidateLines - 1]
+            // The percentage describes the text scale relative to the full
+            // 20% headline zone, not a second percentage of the per-line slot.
+            // This keeps the intended proportional scaling:
+            // 1 line = 100%, 2 = 50%, 3 = 33.33%, 4 = 24%.
+            val targetGlyphHeight =
+                headlineAreaHeight * slotFractions[candidateLines - 1] * 0.82f
 
             paint.textSize = 100f
             val referenceGlyphHeight =
@@ -549,7 +554,7 @@ class MainActivity : ComponentActivity() {
             val referenceGlyphHeight =
                 (paint.fontMetrics.descent - paint.fontMetrics.ascent).coerceAtLeast(1f)
             chosenSize =
-                100f * (slotHeight * slotFractions[3]) / referenceGlyphHeight
+                100f * (headlineAreaHeight * slotFractions[3] * 0.82f) / referenceGlyphHeight
             chosenLines = 4
         }
 
