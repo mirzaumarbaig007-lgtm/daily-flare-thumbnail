@@ -1346,16 +1346,16 @@ class MainActivity : ComponentActivity() {
 
         val words = headline.take(240).trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         val textWidth = 900f
-        // Match the compact reference style: smaller headline, wider side margins,
-        // and a shorter text block while keeping it comfortably above the icons.
-        val headlineTop = height * 0.680f
+        // Match the reference: bold/wide headline, centered lower on the image,
+        // with enough side breathing room and a compact vertical block.
+        val headlineTop = height * 0.700f
         val headlineBottom = height * 0.880f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
             val measurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.textSize = textSize
-                typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                typeface = try { montserratExtraBoldTypeface } catch (_: Throwable) { Typeface.create("sans-serif", Typeface.BOLD) }
             }
             val lines = mutableListOf<MutableList<Int>>()
             var current = mutableListOf<Int>()
@@ -1377,7 +1377,7 @@ class MainActivity : ComponentActivity() {
             return lines
         }
 
-        var textSize = 76f
+        var textSize = 82f
         var lines = makeLines(textSize)
         while (lines.size > maxLines && textSize > 54f) {
             textSize -= 4f
@@ -1388,12 +1388,12 @@ class MainActivity : ComponentActivity() {
         }
 
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = try { montserratExtraBoldTypeface } catch (_: Throwable) { Typeface.create("sans-serif", Typeface.BOLD) }
             this.textSize = textSize
             textAlign = Paint.Align.LEFT
         }
 
-        val lineHeight = textSize * 1.00f
+        val lineHeight = textSize * 1.04f
         val blockHeight = lines.size * lineHeight
         val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent()
 
