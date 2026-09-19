@@ -753,34 +753,38 @@ class MainActivity : ComponentActivity() {
                         ) {
                             words.forEachIndexed { index, word ->
                                 val isSelected = index in selected
-                                Surface(
+                                Box(
                                     modifier = Modifier
                                         .height(28.dp)
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .background(
+                                            if (isSelected) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                ComposeColor.Transparent
+                                            }
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                ComposeColor(0xFF85808A)
+                                            },
+                                            RoundedCornerShape(7.dp)
+                                        )
                                         .clickable {
                                             selected = if (isSelected) {
                                                 selected - index
                                             } else {
                                                 selected + index
                                             }
-                                        },
-                                    shape = RoundedCornerShape(7.dp),
-                                    color = if (isSelected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        ComposeColor.Transparent
-                                    },
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (isSelected) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            ComposeColor(0xFF85808A)
                                         }
-                                    )
+                                        .padding(horizontal = 8.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         word,
-                                        modifier = Modifier.padding(horizontal = 8.dp),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1
