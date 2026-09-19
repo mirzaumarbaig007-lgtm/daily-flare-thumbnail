@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity() {
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
                 val previewHeadlineHeight = maxHeight * 0.20f
-                val previewSocialHeight = maxHeight * 0.05f
+                val previewSocialHeight = maxHeight * 0.10f
                 // Main image: a centered + button until an image is selected.
                 if (mainBitmap == null) {
                     Button(
@@ -269,7 +269,7 @@ class MainActivity : ComponentActivity() {
                             .height(previewSocialHeight)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         // Social asset occupies the full 1080px canvas width and
-                        // exactly the bottom 5% (67.5px) of the 1350px output.
+                        // exactly the bottom 10% (135px) of the 1350px output.
                         contentScale = ContentScale.FillBounds
                     )
                 }
@@ -578,19 +578,37 @@ class MainActivity : ComponentActivity() {
             val localW = (lw + shadowPadding * 2f).toInt().coerceAtLeast(1)
             val localH = (lh + shadowPadding * 2f).toInt().coerceAtLeast(1)
 
+            // Build the shadow from the visible TDF mark itself, not from the
+            // rectangular bounds of the logo bitmap. If the supplied logo has a
+            // solid/dark background, that background is excluded from the mask.
             val logoMask = Bitmap.createBitmap(localW, localH, Bitmap.Config.ALPHA_8)
-            val maskCanvas = Canvas(logoMask)
-            val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            maskCanvas.drawBitmap(
-                it, null,
-                android.graphics.RectF(
-                    shadowPadding,
-                    shadowPadding,
-                    shadowPadding + lw,
-                    shadowPadding + lh
-                ),
-                maskPaint
-            )
+            val src = it.copy(Bitmap.Config.ARGB_8888, false)
+            val pixels = IntArray(src.width * src.height)
+            src.getPixels(pixels, 0, src.width, 0, 0, src.width, src.height)
+            val maskPixels = ByteArray(localW * localH)
+            for (py in 0 until src.height) {
+                for (px in 0 until src.width) {
+                    val p = pixels[py * src.width + px]
+                    val a = android.graphics.Color.alpha(p)
+                    val r = android.graphics.Color.red(p)
+                    val g = android.graphics.Color.green(p)
+                    val b = android.graphics.Color.blue(p)
+                    val luminance = (0.2126f * r + 0.7152f * g + 0.0722f * b)
+                    // White TDF mark remains solid; black/dark rectangular backing
+                    // contributes no shadow. Transparent pixels remain transparent.
+                    val visible = if (a == 0) 0f else ((luminance - 18f) / 237f).coerceIn(0f, 1f)
+                    val maskAlpha = (a / 255f * visible * 255f).toInt()
+                    val mx = shadowPadding.toInt() + (px * lw / src.width).toInt()
+                    val my = shadowPadding.toInt() + (py * lh / src.height).toInt()
+                    if (mx in 0 until localW && my in 0 until localH) {
+                        val idx = my * localW + mx
+                        if (maskAlpha > (maskPixels[idx].toInt() and 0xFF)) {
+                            maskPixels[idx] = maskAlpha.toByte()
+                        }
+                    }
+                }
+            }
+            logoMask.setPixels(maskPixels.map { it.toInt() and 0xFF }.toIntArray(), 0, localW, 0, 0, localW, localH)
 
             val blurred = logoMask.extractAlpha(
                 Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -602,7 +620,7 @@ class MainActivity : ComponentActivity() {
                 null
             )
 
-            // Turn the blurred alpha mask into black pixels using SRC_IN.
+            // Black pixels are masked only by the blurred TDF silhouette.
             val shadow = Bitmap.createBitmap(localW, localH, Bitmap.Config.ARGB_8888)
             val shadowCanvas = Canvas(shadow)
             shadowCanvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
@@ -613,7 +631,7 @@ class MainActivity : ComponentActivity() {
             )
             shadowCanvas.drawBitmap(blurred, 0f, 0f, blackPaint)
             blackPaint.xfermode = null
-            blackPaint.alpha = 150
+            blackPaint.alpha = 145
 
             canvas.drawBitmap(
                 shadow,
@@ -746,10 +764,10 @@ class MainActivity : ComponentActivity() {
         canvas.restore()
 
         // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 5% = 67.5px.
+        // full 1080px output width and the exact bottom 10% = 135px.
         // No crop or trim; the bitmap is drawn into the complete social area.
         socials?.let {
-            val socialAreaTop = height * 0.95f
+            val socialAreaTop = height * 0.90f
             canvas.drawBitmap(
                 it,
                 null,
