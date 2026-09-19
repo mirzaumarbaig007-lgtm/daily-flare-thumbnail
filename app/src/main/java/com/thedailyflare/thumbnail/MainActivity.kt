@@ -409,18 +409,21 @@ class MainActivity : ComponentActivity() {
                 previewBitmap = null
                 previewError = null
                 val rendered = withContext(Dispatchers.Default) {
+                    val title = headline.trim().ifBlank { "Daily Flare" }
                     try {
-                        renderThumbnail(
-                            source,
-                            logoBitmap,
-                            headline.trim().ifBlank { "Daily Flare" },
-                            highlighted,
-                            logoPosition
-                        )
+                        renderThumbnail(source, logoBitmap, title, highlighted, logoPosition)
                     } catch (_: OutOfMemoryError) {
-                        null
+                        try {
+                            renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
+                        } catch (_: Throwable) {
+                            null
+                        }
                     } catch (_: Exception) {
-                        null
+                        try {
+                            renderFallbackThumbnail(source, logoBitmap, title, logoPosition)
+                        } catch (_: Throwable) {
+                            null
+                        }
                     }
                 }
                 previewBitmap = rendered
@@ -1425,6 +1428,102 @@ class MainActivity : ComponentActivity() {
                     val featureCenterY = height * 0.725f
                     drawCenterLogoFeature(canvas, it, width, featureCenterY)
                 }
+            }
+        }
+
+        return output
+    }
+
+    private fun renderFallbackThumbnail(
+        source: Bitmap,
+        logo: Bitmap?,
+        headline: String,
+        logoPosition: LogoPosition
+    ): Bitmap {
+        // Last-resort renderer: deliberately uses only simple Canvas operations.
+        // This keeps the preview/export usable even if StaticLayout, vector icons,
+        // or a font resource fails on a particular device.
+        val width = 1080
+        val height = 1350
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+        val canvas = Canvas(output)
+
+        val scale = maxOf(width.toFloat() / source.width, height.toFloat() / source.height)
+        val dw = source.width * scale
+        val dh = source.height * scale
+        val left = (width - dw) / 2f
+        val top = (height - dh) / 2f
+        canvas.drawBitmap(
+            source,
+            null,
+            android.graphics.RectF(left, top, left + dw, top + dh),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+
+        val fade = Paint().apply {
+            shader = LinearGradient(
+                0f, height * 0.58f, 0f, height.toFloat(),
+                Color.TRANSPARENT,
+                Color.argb(235, 0, 0, 0),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, height * 0.58f, width.toFloat(), height.toFloat(), fade)
+
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+            color = Color.WHITE
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+        }
+
+        val words = headline.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val lines = mutableListOf<String>()
+        var current = ""
+        val maxWidth = width * 0.90f
+        val textSize = 86f
+        paint.textSize = textSize
+
+        for (word in words) {
+            val candidate = if (current.isEmpty()) word else "$current $word"
+            if (current.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
+                lines += current
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+        if (current.isNotEmpty()) lines += current
+        val visibleLines = lines.takeLast(4)
+        val lineHeight = 92f
+        val startY = height - 115f - (visibleLines.size - 1) * lineHeight
+
+        visibleLines.forEachIndexed { index, line ->
+            canvas.drawText(line, width / 2f, startY + index * lineHeight, paint)
+        }
+
+        logo?.let {
+            try {
+                val maxLogo = 210f
+                val scaleLogo = minOf(maxLogo / it.width, maxLogo / it.height)
+                val lw = it.width * scaleLogo
+                val lh = it.height * scaleLogo
+                val x = when (logoPosition) {
+                    LogoPosition.LEFT -> 48f
+                    LogoPosition.RIGHT -> width - 48f - lw
+                    LogoPosition.CENTER_BOTTOM -> (width - lw) / 2f
+                }
+                val y = when (logoPosition) {
+                    LogoPosition.CENTER_BOTTOM -> height * 0.725f - lh / 2f
+                    else -> 48f
+                }
+                canvas.drawBitmap(
+                    it,
+                    null,
+                    android.graphics.RectF(x, y, x + lw, y + lh),
+                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                )
+            } catch (_: Throwable) {
+                // Keep the thumbnail usable even if the logo bitmap is invalid.
             }
         }
 
