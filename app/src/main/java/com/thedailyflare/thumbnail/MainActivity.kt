@@ -107,48 +107,45 @@ class MainActivity : ComponentActivity() {
         uri?.let { contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) }
     } catch (_: Exception) { null }
 
-    // The Daily Flare logo is normally white artwork on a dark square/matte.
-    // Remove that dark matte when present so the visible logo and its shadow
-    // follow the actual letter silhouette rather than a rectangular image box.
+    // The logo asset can contain a dark square/matte around white artwork.
+    // Convert that matte to transparency before both preview and export so the
+    // shadow is generated from the visible logo silhouette only.
     private fun cleanLogoBitmap(source: Bitmap): Bitmap {
         val w = source.width
         val h = source.height
         val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-
-        val samplePoints = arrayOf(
-            0 to 0, (w - 1) to 0, 0 to (h - 1), (w - 1) to (h - 1),
-            w / 2 to 0, w / 2 to (h - 1), 0 to h / 2, (w - 1) to h / 2
-        )
-        var darkOpaqueCorners = 0
-        for ((x, y) in samplePoints) {
-            val p = source.getPixel(x, y)
-            val a = Color.alpha(p)
-            val luminance = (0.299f * Color.red(p) + 0.587f * Color.green(p) + 0.114f * Color.blue(p))
-            if (a > 220 && luminance < 55f) darkOpaqueCorners++
-        }
-
-        // Only strip a dark matte when the image actually has one.
-        val hasDarkMatte = darkOpaqueCorners >= 4
-        if (!hasDarkMatte) return source
-
         val pixels = IntArray(w * h)
         source.getPixels(pixels, 0, w, 0, 0, w, h)
+
         for (i in pixels.indices) {
             val p = pixels[i]
-            val alpha = Color.alpha(p)
-            if (alpha == 0) continue
+            val srcAlpha = Color.alpha(p)
+            if (srcAlpha == 0) {
+                pixels[i] = Color.TRANSPARENT
+                continue
+            }
 
-            val luminance = 0.299f * Color.red(p) + 0.587f * Color.green(p) + 0.114f * Color.blue(p)
-            // Keep bright logo artwork. Fade only the dark matte so anti-aliased
-            // edges remain smooth instead of becoming a hard cutout.
-            val matteAlpha = ((luminance - 35f) / 55f * alpha.toFloat()).coerceIn(0f, alpha.toFloat())
+            val luminance =
+                0.299f * Color.red(p) +
+                0.587f * Color.green(p) +
+                0.114f * Color.blue(p)
+
+            // White TDF artwork stays opaque. Dark/black matte becomes
+            // transparent. A short transition preserves anti-aliased edges.
+            val alpha = when {
+                luminance <= 48f -> 0f
+                luminance >= 150f -> srcAlpha.toFloat()
+                else -> srcAlpha * ((luminance - 48f) / 102f)
+            }
+
             pixels[i] = Color.argb(
-                matteAlpha.toInt(),
+                alpha.toInt().coerceIn(0, 255),
                 Color.red(p),
                 Color.green(p),
                 Color.blue(p)
             )
         }
+
         result.setPixels(pixels, 0, w, 0, 0, w, h)
         return result
     }
