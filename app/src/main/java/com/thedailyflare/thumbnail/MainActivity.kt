@@ -48,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -72,9 +73,22 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.zIndex
+import android.view.View
+import androidx.compose.ui.graphics.ColorFilter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private object SimpleIconsLocal {
+    val facebook get() = Facebook
+    val instagram get() = Instagram
+    val x get() = X
+    val threads get() = Threads
+    val pinterest get() = Pinterest
+    val tumblr get() = Tumblr
+    val youtube get() = Youtube
+}
 
 class MainActivity : ComponentActivity() {
     private val prefs by lazy {
@@ -105,9 +119,7 @@ class MainActivity : ComponentActivity() {
     private fun ThumbnailScreen() {
         var mainBitmap by remember { mutableStateOf<Bitmap?>(null) }
         var logoUri by rememberSaveable { mutableStateOf(prefs.getString("logo_uri", null)) }
-        var socialsUri by rememberSaveable { mutableStateOf(prefs.getString("socials_uri", null)) }
         var logoBitmap by remember { mutableStateOf<Bitmap?>(null) }
-        var socialsBitmap by remember { mutableStateOf<Bitmap?>(null) }
         var headline by rememberSaveable { mutableStateOf("") }
         var highlighted by rememberSaveable { mutableStateOf(emptySet<Int>()) }
         var showTextPopup by remember { mutableStateOf(false) }
@@ -122,16 +134,7 @@ class MainActivity : ComponentActivity() {
                 logoBitmap = loadBitmap(uri)
             }
         }
-        val socialsPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                persistUri(uri, "socials_uri")
-                socialsUri = uri.toString()
-                socialsBitmap = loadBitmap(uri)
-            }
-        }
-
         LaunchedEffect(logoUri) { logoBitmap = loadBitmap(logoUri?.let(Uri::parse)) }
-        LaunchedEffect(socialsUri) { socialsBitmap = loadBitmap(socialsUri?.let(Uri::parse)) }
 
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -240,39 +243,16 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // Social icons: a small bottom strip in their final position.
-                if (socialsBitmap == null) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(previewSocialHeight)
-                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
-                        color = ComposeColor.White.copy(alpha = 0.88f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                "Select your social icons",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                } else {
-                    Image(
-                        socialsBitmap!!.asImageBitmap(),
-                        "Social icons",
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(previewSocialHeight)
-                            .clickable { socialsPicker.launch(arrayOf("image/*")) },
-                        // Social asset occupies the full 1080px canvas width and
-                        // exactly the bottom 20% (270px) of the 1350px output.
-                        contentScale = ContentScale.FillBounds
-                    )
-                }
+                // Real social-brand vectors are bundled locally in the APK.
+                // They are drawn above the other layers and touch the bottom edge.
+                SocialIconsRow(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(previewSocialHeight)
+                        .zIndex(2f),
+                    iconSizePx = 34f
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -283,7 +263,7 @@ class MainActivity : ComponentActivity() {
                         mainBitmap?.let {
                             val title = headline.trim().ifBlank { "Daily Flare" }
                             saveThumbnail(
-                                renderThumbnail(it, logoBitmap, socialsBitmap, title, highlighted),
+                                renderThumbnail(it, logoBitmap, title, highlighted),
                                 title
                             )
                         }
@@ -317,6 +297,48 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    @Composable
+    private fun SocialIconsRow(
+        modifier: Modifier,
+        iconSizePx: Float
+    ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val iconSize = with(density) { iconSizePx.toDp() }
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Icon(SimpleIconsLocal.facebook, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.instagram, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.x, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.threads, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.pinterest, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.tumblr, null, Modifier.size(iconSize), tint = ComposeColor.White)
+            Icon(SimpleIconsLocal.youtube, null, Modifier.size(iconSize), tint = ComposeColor.White)
+        }
+    }
+
+    private fun renderSocialIconsBitmap(width: Int, height: Int): Bitmap {
+        val composeView = ComposeView(this)
+        composeView.setContent {
+            SocialIconsRow(
+                modifier = Modifier.fillMaxSize(),
+                iconSizePx = 34f
+            )
+        }
+        composeView.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+        )
+        composeView.layout(0, 0, width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.TRANSPARENT)
+        composeView.draw(Canvas(bitmap))
+        composeView.disposeComposition()
+        return bitmap
     }
 
     @Composable
@@ -541,7 +563,6 @@ class MainActivity : ComponentActivity() {
     private fun renderThumbnail(
         source: Bitmap,
         logo: Bitmap?,
-        socials: Bitmap?,
         headline: String,
         highlighted: Set<Int>
     ): Bitmap {
@@ -651,23 +672,17 @@ class MainActivity : ComponentActivity() {
         }
         canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
 
-        // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 20% = 270px.
-        // No crop or trim; the bitmap is drawn into the complete social area.
-        socials?.let {
-            val socialAreaTop = height * 0.80f
-            canvas.drawBitmap(
-                it,
-                null,
-                android.graphics.RectF(
-                    0f,
-                    socialAreaTop,
-                    width.toFloat(),
-                    height.toFloat()
-                ),
-                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            )
-        }
+        // Draw the same bundled vector icons used by the preview.
+        // The icon row is rendered locally into a transparent bitmap only for
+        // the final JPG export; there is no network dependency.
+        val socialIcons = renderSocialIconsBitmap(width, (height * 0.20f).toInt())
+        canvas.drawBitmap(
+            socialIcons,
+            0f,
+            height - socialIcons.height.toFloat(),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+        socialIcons.recycle()
 
         val words = headline.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
         val fullText = words.joinToString(" ")
