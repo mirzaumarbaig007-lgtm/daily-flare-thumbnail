@@ -207,8 +207,7 @@ class MainActivity : ComponentActivity() {
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
                 val previewHeadlineHeight = maxHeight * 0.20f
-                val previewSocialHeight = maxHeight * 0.05f
-                // Main image: a centered + button until an image is selected.
+
                 if (mainBitmap == null) {
                     Button(
                         onClick = { mainPicker.launch(arrayOf("image/*")) },
@@ -217,166 +216,91 @@ class MainActivity : ComponentActivity() {
                         Text("＋", fontSize = 32.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    Image(
-                        mainBitmap!!.asImageBitmap(),
-                        "Main image",
-                        Modifier.fillMaxSize().clickable {
-                            mainPicker.launch(arrayOf("image/*"))
-                        },
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Logo feature has three positions:
-                // Left (default), Right, or Bottom-Center above the headline.
-                when (logoPosition) {
-                    LogoPosition.LEFT, LogoPosition.RIGHT -> {
-                        Box(
-                            modifier = Modifier
-                                .align(
-                                    if (logoPosition == LogoPosition.LEFT)
-                                        Alignment.TopStart else Alignment.TopEnd
-                                )
-                                .padding(
-                                    start = if (logoPosition == LogoPosition.LEFT) 28.dp else 0.dp,
-                                    end = if (logoPosition == LogoPosition.RIGHT) 28.dp else 0.dp,
-                                    top = 24.dp
-                                )
-                                .height(128.dp)
-                                .width(128.dp)
-                                .zIndex(3f)
-                                .clickable { logoPicker.launch(arrayOf("image/*")) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (logoBitmap == null) {
-                                Surface(
-                                    modifier = Modifier.fillMaxSize(),
-                                    color = ComposeColor.Black.copy(alpha = 0.28f),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            "Select logo",
-                                            color = ComposeColor.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                            } else {
-                                Image(
-                                    logoBitmap!!.asImageBitmap(),
-                                    "Logo",
-                                    Modifier.fillMaxSize().padding(4.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                            }
-                        }
+                    // Preview the exact same 1080x1350 renderer used by Export.
+                    // This keeps crop, fade, logo shadow, headline, highlights and
+                    // social icons visually identical to the final JPG.
+                    val previewBitmap = remember(
+                        mainBitmap,
+                        logoBitmap,
+                        headline,
+                        highlighted,
+                        logoPosition
+                    ) {
+                        renderThumbnail(
+                            mainBitmap!!,
+                            logoBitmap,
+                            headline.trim().ifBlank { "Daily Flare" },
+                            highlighted,
+                            logoPosition
+                        )
                     }
 
-                    LogoPosition.CENTER_BOTTOM -> {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .height(previewHeadlineHeight * 0.25f)
-                                .zIndex(3f)
-                                .offset(y = -(previewHeadlineHeight + previewSocialHeight)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            androidx.compose.foundation.Canvas(
-                                Modifier.fillMaxSize()
-                            ) {
-                                val centerY = size.height / 2f
-                                val logoGap = 28.dp.toPx()
-                                val sidePadding = 22.dp.toPx()
-                                drawLine(
-                                    color = ComposeColor.White.copy(alpha = 0.88f),
-                                    start = androidx.compose.ui.geometry.Offset(sidePadding, centerY),
-                                    end = androidx.compose.ui.geometry.Offset(size.width / 2f - logoGap, centerY),
-                                    strokeWidth = 1.5.dp.toPx()
-                                )
-                                drawLine(
-                                    color = ComposeColor.White.copy(alpha = 0.88f),
-                                    start = androidx.compose.ui.geometry.Offset(size.width / 2f + logoGap, centerY),
-                                    end = androidx.compose.ui.geometry.Offset(size.width - sidePadding, centerY),
-                                    strokeWidth = 1.5.dp.toPx()
-                                )
-                            }
+                    Image(
+                        previewBitmap.asImageBitmap(),
+                        "Final thumbnail preview",
+                        Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
+                    )
 
+                    // Invisible interaction zones sit above the rendered final image.
+                    // They do not alter the preview appearance.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .zIndex(1f)
+                            .clickable { mainPicker.launch(arrayOf("image/*")) }
+                    )
+
+                    // Logo picker zone — the actual logo remains visible underneath.
+                    when (logoPosition) {
+                        LogoPosition.LEFT -> {
                             Box(
                                 Modifier
-                                    .size(42.dp)
-                                    .clickable { logoPicker.launch(arrayOf("image/*")) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (logoBitmap == null) {
-                                    Text(
-                                        "＋",
-                                        color = ComposeColor.White,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                } else {
-                                    Image(
-                                        logoBitmap!!.asImageBitmap(),
-                                        "Bottom logo",
-                                        Modifier.fillMaxSize().padding(4.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                }
-                            }
+                                    .align(Alignment.TopStart)
+                                    .padding(start = 12.dp, top = 12.dp)
+                                    .size(150.dp)
+                                    .zIndex(3f)
+                                    .clickable { logoPicker.launch(arrayOf("image/*")) }
+                            )
                         }
-                    }
-                }
 
-                // Headline: click the final text area to open the text/highlight editor.
-                if (headline.isBlank()) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(previewHeadlineHeight)
-                            .offset(y = -previewSocialHeight)
-                            .padding(horizontal = 18.dp, vertical = 0.dp)
-                            .clickable { showTextPopup = true },
-                        color = ComposeColor.Black.copy(alpha = 0.28f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                "Tap to add headline",
-                                color = ComposeColor.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold
+                        LogoPosition.RIGHT -> {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(end = 12.dp, top = 12.dp)
+                                    .size(150.dp)
+                                    .zIndex(3f)
+                                    .clickable { logoPicker.launch(arrayOf("image/*")) }
+                            )
+                        }
+
+                        LogoPosition.CENTER_BOTTOM -> {
+                            Box(
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(previewHeadlineHeight * 0.30f)
+                                    .offset(y = -(previewHeadlineHeight + 4.dp))
+                                    .zIndex(3f)
+                                    .clickable { logoPicker.launch(arrayOf("image/*")) }
                             )
                         }
                     }
-                } else {
-                    HeadlinePreview(
-                        headline,
-                        highlighted,
-                        previewHeadlineHeight,
+
+                    // Headline editor zone. It is invisible but follows the exact
+                    // final headline position above the social strip.
+                    Box(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
-                            .offset(y = -previewSocialHeight)
+                            .offset(y = -maxHeight * 0.05f)
+                            .zIndex(2f)
                             .clickable { showTextPopup = true }
                     )
                 }
 
-                // Real social-brand vectors are bundled locally in the APK.
-                // They are drawn above the other layers and touch the bottom edge.
-                SocialIconsRow(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .height(previewSocialHeight)
-                        .zIndex(2f),
-                    iconSizePx = 34f
-                )
-            }
 
             Spacer(Modifier.height(10.dp))
             Text("Logo position", fontWeight = FontWeight.Bold, fontSize = 14.sp)
