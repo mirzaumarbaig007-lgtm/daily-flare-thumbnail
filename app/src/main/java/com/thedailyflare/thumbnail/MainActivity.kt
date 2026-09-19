@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity() {
                     .background(ComposeColor(0xFFEAEAEA))
             ) {
                 val previewHeadlineHeight = maxHeight * 0.20f
-                val previewSocialHeight = maxHeight * 0.15f
+                val previewSocialHeight = maxHeight * 0.20f
                 // Main image: a centered + button until an image is selected.
                 if (mainBitmap == null) {
                     Button(
@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
                             .padding(horizontal = 18.dp, vertical = 8.dp)
-                            .offset(y = -(previewSocialHeight * 0.6666667f))
+                            .offset(y = -(previewSocialHeight * 0.625f))
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
                         shape = RoundedCornerShape(8.dp)
@@ -269,7 +269,7 @@ class MainActivity : ComponentActivity() {
                             .height(previewSocialHeight)
                             .clickable { socialsPicker.launch(arrayOf("image/*")) },
                         // Social asset occupies the full 1080px canvas width and
-                        // exactly the bottom 15% (202.5px) of the 1350px output.
+                        // exactly the bottom 20% (270px) of the 1350px output.
                         contentScale = ContentScale.FillBounds
                     )
                 }
@@ -668,10 +668,10 @@ class MainActivity : ComponentActivity() {
         canvas.drawRect(0f, height * 0.44f, width.toFloat(), height.toFloat(), fade)
 
         // Social icons use the complete user-provided asset across the
-        // full 1080px output width and the exact bottom 15% = 202.5px.
+        // full 1080px output width and the exact bottom 20% = 270px.
         // No crop or trim; the bitmap is drawn into the complete social area.
         socials?.let {
-            val socialAreaTop = height * 0.85f
+            val socialAreaTop = height * 0.80f
             canvas.drawBitmap(
                 it,
                 null,
@@ -706,9 +706,9 @@ class MainActivity : ComponentActivity() {
             .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
             .build()
 
-        // Keep the headline 10% of the full canvas height above the bottom edge.
+        // Keep the headline 12.5% of the full canvas height above the bottom edge.
         // This leaves the social layer underneath/behind the lower part of the text.
-        val textBottom = height * 0.90f
+        val textBottom = height * 0.875f
         val textTop = textBottom - metrics.lineHeight * metrics.lineCount
 
         canvas.save()
