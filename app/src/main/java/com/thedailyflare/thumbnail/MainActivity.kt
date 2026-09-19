@@ -201,7 +201,8 @@ class MainActivity : ComponentActivity() {
             // All four inputs are interactive areas inside the thumbnail preview.
             // There are no separate input buttons above the preview.
             BoxWithConstraints(
-                Modifier.fillMaxWidth()
+                Modifier
+                    .fillMaxWidth()
                     .aspectRatio(0.8f)
                     .clip(RoundedCornerShape(2.dp))
                     .background(ComposeColor(0xFFEAEAEA))
@@ -216,9 +217,6 @@ class MainActivity : ComponentActivity() {
                         Text("＋", fontSize = 32.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    // Preview the exact same 1080x1350 renderer used by Export.
-                    // This keeps crop, fade, logo shadow, headline, highlights and
-                    // social icons visually identical to the final JPG.
                     val previewBitmap = remember(
                         mainBitmap,
                         logoBitmap,
@@ -238,20 +236,12 @@ class MainActivity : ComponentActivity() {
                     Image(
                         previewBitmap.asImageBitmap(),
                         "Final thumbnail preview",
-                        Modifier.fillMaxSize(),
+                        Modifier
+                            .fillMaxSize()
+                            .clickable { mainPicker.launch(arrayOf("image/*")) },
                         contentScale = ContentScale.FillBounds
                     )
 
-                    // Invisible interaction zones sit above the rendered final image.
-                    // They do not alter the preview appearance.
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(1f)
-                            .clickable { mainPicker.launch(arrayOf("image/*")) }
-                    )
-
-                    // Logo picker zone — the actual logo remains visible underneath.
                     when (logoPosition) {
                         LogoPosition.LEFT -> {
                             Box(
@@ -263,7 +253,6 @@ class MainActivity : ComponentActivity() {
                                     .clickable { logoPicker.launch(arrayOf("image/*")) }
                             )
                         }
-
                         LogoPosition.RIGHT -> {
                             Box(
                                 Modifier
@@ -274,7 +263,6 @@ class MainActivity : ComponentActivity() {
                                     .clickable { logoPicker.launch(arrayOf("image/*")) }
                             )
                         }
-
                         LogoPosition.CENTER_BOTTOM -> {
                             Box(
                                 Modifier
@@ -288,19 +276,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Headline editor zone. It is invisible but follows the exact
-                    // final headline position above the social strip.
                     Box(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
-                            .offset(y = -maxHeight * 0.05f)
+                            .offset(y = -(maxHeight * 0.05f))
                             .zIndex(2f)
                             .clickable { showTextPopup = true }
                     )
                 }
-
+            }
 
             Spacer(Modifier.height(10.dp))
             Text("Logo position", fontWeight = FontWeight.Bold, fontSize = 14.sp)
