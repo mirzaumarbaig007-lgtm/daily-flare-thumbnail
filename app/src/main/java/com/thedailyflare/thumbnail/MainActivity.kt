@@ -933,17 +933,19 @@ class MainActivity : ComponentActivity() {
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
         )
 
-        // Reference-style black fade rising only around the headline area.
+        // Headline fade: begins subtly at 60%, transitions through 75%,
+        // becomes strongly black from roughly 78% and reaches near-solid black by 90%.
         val fade = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, height * 0.60f, 0f, height * 0.91f,
+                0f, height * 0.60f, 0f, height * 0.90f,
                 intArrayOf(
                     Color.TRANSPARENT,
-                    Color.argb(150, 0, 0, 0),
+                    Color.argb(75, 0, 0, 0),
+                    Color.argb(165, 0, 0, 0),
                     Color.argb(238, 0, 0, 0),
                     Color.argb(250, 0, 0, 0)
                 ),
-                floatArrayOf(0f, 0.42f, 0.78f, 1f),
+                floatArrayOf(0f, 0.50f, 0.65f, 0.80f, 1f),
                 Shader.TileMode.CLAMP
             )
         }
