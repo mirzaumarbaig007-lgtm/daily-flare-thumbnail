@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
                             .padding(horizontal = 18.dp, vertical = 8.dp)
-                            .offset(y = -previewSocialHeight)
+                            .offset(y = -(previewSocialHeight * 0.6666667f))
                             .clickable { showTextPopup = true },
                         color = ComposeColor.Black.copy(alpha = 0.28f),
                         shape = RoundedCornerShape(8.dp)
@@ -235,7 +235,7 @@ class MainActivity : ComponentActivity() {
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .height(previewHeadlineHeight)
-                            .offset(y = -previewSocialHeight)
+                            .offset(y = -(previewSocialHeight * 0.6666667f))
                             .clickable { showTextPopup = true }
                     )
                 }
@@ -706,7 +706,10 @@ class MainActivity : ComponentActivity() {
             .setLineSpacing(metrics.lineHeight - (textPaint.fontMetrics.descent - textPaint.fontMetrics.ascent), 1f)
             .build()
 
-        val textTop = headlineAreaTop + (headlineAreaHeight - metrics.lineHeight * metrics.lineCount) / 2f
+        // Keep the headline 10% of the full canvas height above the bottom edge.
+        // This leaves the social layer underneath/behind the lower part of the text.
+        val textBottom = height * 0.90f
+        val textTop = textBottom - metrics.lineHeight * metrics.lineCount
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
