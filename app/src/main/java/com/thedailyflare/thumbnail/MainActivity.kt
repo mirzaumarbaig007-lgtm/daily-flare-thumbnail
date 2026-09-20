@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -542,6 +543,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxWidth()
                                 .height(previewHeadlineHeight)
                                 .offset(y = -(maxHeight * 0.08f))
+                                .graphicsLayer { scaleY = 0.88f }
                                 .zIndex(2f)
                                 .clickable { showTextPopup = true }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1591,6 +1593,9 @@ class MainActivity : ComponentActivity() {
 
         canvas.save()
         canvas.translate((width - textWidth) / 2f, textTop)
+        // Vertically compress the headline while preserving its horizontal width.
+        // This applies equally to the highlight boxes and glyphs below.
+        canvas.scale(1f, 0.88f, textWidth / 2f, layoutHeight / 2f)
 
         // Draw tight white highlight rectangles behind the actual glyph runs.
         // Adjacent highlighted words on the same line are merged, including their
