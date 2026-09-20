@@ -1351,8 +1351,8 @@ class MainActivity : ComponentActivity() {
         // of text instead of being trapped in a narrow fixed 900px column.
         // 1025px leaves about 2.5% margin on each side of the 1080px canvas.
         val textWidth = width * 0.949f
-        val headlineTop = height * 0.695f
-        val headlineBottom = height * 0.945f
+        val headlineTop = height * 0.710f
+        val headlineBottom = height * 0.960f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
@@ -1426,7 +1426,7 @@ class MainActivity : ComponentActivity() {
         canvas.save()
         canvas.scale(
             1f,
-            0.85f,
+            0.90f,
             width / 2f,
             (headlineTop + headlineBottom) / 2f
         )
