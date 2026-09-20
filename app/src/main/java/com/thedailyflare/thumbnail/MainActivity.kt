@@ -541,7 +541,7 @@ class MainActivity : ComponentActivity() {
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .height(previewHeadlineHeight)
-                                .offset(y = -(maxHeight * 0.05f))
+                                .offset(y = -(maxHeight * 0.08f))
                                 .zIndex(2f)
                                 .clickable { showTextPopup = true }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1349,8 +1349,8 @@ class MainActivity : ComponentActivity() {
         // of text instead of being trapped in a narrow fixed 900px column.
         // 1025px leaves about 2.5% margin on each side of the 1080px canvas.
         val textWidth = width * 0.949f
-        val headlineTop = height * 0.700f
-        val headlineBottom = height * 0.950f
+        val headlineTop = height * 0.670f
+        val headlineBottom = height * 0.920f
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
