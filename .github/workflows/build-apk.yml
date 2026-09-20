@@ -26,35 +26,6 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Apply stronger headline vertical compression
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("app/src/main/java/com/thedailyflare/thumbnail/MainActivity.kt")
-          s = p.read_text()
-          old = "scaleY = 0.88f"
-          new = "scaleY = 0.70f"
-          count = s.count(old)
-          if count != 1:
-              raise SystemExit(f"Expected exactly 1 preview scaleY occurrence, found {count}")
-          s = s.replace(old, new, 1)
-          old_export = 'canvas.scale(1f, 0.88f, textWidth / 2f, layoutHeight / 2f)'
-          new_export = 'canvas.scale(1f, 0.70f, textWidth / 2f, layoutHeight / 2f)'
-          count_export = s.count(old_export)
-          if count_export != 1:
-              raise SystemExit(f"Expected exactly 1 export scale occurrence, found {count_export}")
-          s = s.replace(old_export, new_export, 1)
-          p.write_text(s)
-          PY
-
-      - name: Persist source fix to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/com/thedailyflare/thumbnail/MainActivity.kt
-          git commit -m "Increase headline vertical compression [skip ci]" || true
-          git push origin HEAD:main
-
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon
 
