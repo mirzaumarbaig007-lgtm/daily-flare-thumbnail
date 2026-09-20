@@ -1351,8 +1351,14 @@ class MainActivity : ComponentActivity() {
         // of text instead of being trapped in a narrow fixed 900px column.
         // 1025px leaves about 2.5% margin on each side of the 1080px canvas.
         val textWidth = width * 0.949f
-        val headlineTop = height * 0.710f
-        val headlineBottom = height * 0.960f
+
+        // Anchor the headline to the ACTUAL social-icon row in this renderer.
+        // The old 0.710/0.960 percentages only changed the sizing zone's center,
+        // so the visible text barely moved. The icons are drawn at this exact Y:
+        // height - 72px - 2% margin. Keep the headline 16px above that row.
+        val socialIconsTop = height - 72f - (height * 0.02f)
+        val headlineBottom = socialIconsTop - 16f
+        val headlineTop = headlineBottom - (height * 0.25f)
         val maxLines = 4
 
         fun makeLines(textSize: Float): List<List<Int>> {
