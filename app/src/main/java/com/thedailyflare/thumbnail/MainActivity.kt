@@ -115,7 +115,7 @@ private enum class LogoPosition {
 class MainActivity : ComponentActivity() {
     private val montserratExtraBoldTypeface: Typeface by lazy {
         val variableTypeface = Typeface.createFromAsset(assets, "Montserrat[wght].ttf")
-        Typeface.create(variableTypeface, 800, false)
+        Typeface.create(variableTypeface, 900, false)
     }
 
     private val montserratExtraBoldFontFamily: FontFamily by lazy {
@@ -1336,7 +1336,7 @@ class MainActivity : ComponentActivity() {
             canvas.drawBitmap(
                 socialIcons,
                 0f,
-                height - socialIcons.height.toFloat(),
+                height - socialIcons.height.toFloat() - (height * 0.02f),
                 Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             )
             socialIcons.recycle()
