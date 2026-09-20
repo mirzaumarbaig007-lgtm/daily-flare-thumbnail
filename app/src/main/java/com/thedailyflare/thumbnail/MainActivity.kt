@@ -543,7 +543,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxWidth()
                                 .height(previewHeadlineHeight)
                                 .offset(y = -(maxHeight * 0.08f))
-                                .graphicsLayer { scaleY = 0.88f }
+                                .graphicsLayer { scaleY = 0.70f }
                                 .zIndex(2f)
                                 .clickable { showTextPopup = true }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1595,7 +1595,7 @@ class MainActivity : ComponentActivity() {
         canvas.translate((width - textWidth) / 2f, textTop)
         // Vertically compress the headline while preserving its horizontal width.
         // This applies equally to the highlight boxes and glyphs below.
-        canvas.scale(1f, 0.88f, textWidth / 2f, layoutHeight / 2f)
+        canvas.scale(1f, 0.70f, textWidth / 2f, layoutHeight / 2f)
 
         // Draw tight white highlight rectangles behind the actual glyph runs.
         // Adjacent highlighted words on the same line are merged, including their
