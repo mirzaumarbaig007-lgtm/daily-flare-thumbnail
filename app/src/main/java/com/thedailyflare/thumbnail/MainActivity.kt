@@ -1419,6 +1419,18 @@ class MainActivity : ComponentActivity() {
         val blockHeight = lines.size * lineHeight
         val startBaseline = headlineTop + ((headlineBottom - headlineTop) - blockHeight) / 2f - textPaint.ascent()
 
+        // The export path uses this Canvas renderer (not renderThumbnail).
+        // Compress the actual glyphs and highlight boxes vertically here too.
+        // The previous scaleY fix only affected the unused StaticLayout renderer,
+        // which is why the exported APK looked unchanged.
+        canvas.save()
+        canvas.scale(
+            1f,
+            0.70f,
+            width / 2f,
+            (headlineTop + headlineBottom) / 2f
+        )
+
         lines.forEachIndexed { lineIndex, lineWords ->
             var lineWidth = 0f
             lineWords.forEachIndexed { position, wordIndex ->
@@ -1459,6 +1471,8 @@ class MainActivity : ComponentActivity() {
                 x += wordWidth
             }
         }
+
+        canvas.restore()
 
         // Logo remains the top/final branding layer, as before.
         logo?.let {
